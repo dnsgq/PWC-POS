@@ -1462,4 +1462,63 @@ html, body {
 .emp-row-name { font-size: 13px; font-weight: 600; }
 .emp-row-role { font-size: 11px; color: var(--ink-soft); font-family: 'IBM Plex Mono', monospace; }
 
-.hours-row { display: flex; justify-content: space-between; align-items
+.hours-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 4px; border-top: 1px dashed #C9C0AA; }
+.hours-row:first-child { border-top: none; }
+.hours-row-name { font-size: 13px; font-weight: 600; }
+.hours-row-value { font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: var(--ink-soft); }
+
+.cat-list { display: flex; flex-direction: column; gap: 12px; padding: 6px 2px 2px; }
+.cat-row-top { display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+.cat-bar-track { height: 7px; border-radius: 4px; background: var(--paper-dark); overflow: hidden; }
+.cat-bar-fill { height: 100%; border-radius: 4px; }
+
+.export-btn-list { display: flex; flex-direction: column; gap: 8px; padding-top: 6px; }
+
+.divider { height: 1px; background: var(--paper-dark); margin: 16px 0; }
+
+.close-summary { background: #fff; border: 1px solid var(--paper-dark); border-radius: 10px; padding: 10px 14px; }
+.close-row { display: flex; justify-content: space-between; font-size: 12.5px; padding: 5px 0; }
+.close-row-total { border-top: 1px dashed #C9C0AA; margin-top: 4px; padding-top: 8px; font-weight: 700; }
+.mono-val { font-family: 'IBM Plex Mono', monospace; }
+
+.denom-grid { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.denom-row { display: grid; grid-template-columns: 44px 1fr 80px; align-items: center; gap: 8px; }
+.denom-label { font-family: 'IBM Plex Mono', monospace; font-weight: 600; font-size: 13px; }
+.denom-input { text-align: center; }
+.denom-subtotal { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--ink-soft); text-align: right; }
+
+.diff-line { text-align: center; font-size: 12px; font-weight: 600; padding: 6px; border-radius: 8px; margin-top: 6px; }
+.diff-even { background: var(--success-bg); color: var(--success); }
+.diff-over { background: #E3F4F5; color: var(--rule-blue); }
+.diff-short { background: var(--danger-bg); color: var(--danger); }
+
+.bottom-nav {
+  display: flex; gap: 4px; margin: 16px -16px -16px; padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 0px));
+  background: #fff; border-top: 1px solid var(--paper-dark); border-radius: 0 0 16px 16px;
+  position: sticky; bottom: 0;
+}
+.nav-btn {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 7px 4px;
+  background: none; border: none; border-radius: 10px; color: var(--ink-soft); font-family: inherit; font-size: 10.5px; font-weight: 600; cursor: pointer;
+}
+.nav-btn-active { color: var(--rule-blue); background: #E3F4F5; }
+
+.view-panel { padding-bottom: 4px; }
+.view-panel-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.view-panel-title { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 18px; }
+.clear-filter-link { background: none; border: none; color: var(--rule-blue); font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; }
+
+.view-more-link {
+  width: 100%; background: none; border: none; color: var(--rule-blue); font-size: 12px; font-weight: 600;
+  cursor: pointer; font-family: inherit; display: flex; align-items: center; justify-content: center; gap: 3px; padding: 8px 0 2px;
+}
+
+.date-group { margin-top: 16px; }
+.date-group:first-child { margin-top: 8px; }
+.date-group-heading { font-size: 12px; font-weight: 700; color: var(--ink-soft); margin-bottom: 6px; padding-left: 2px; }
+
+.report-row { background: #fff; border: 1px solid var(--paper-dark); border-radius: 10px; padding: 9px 12px; }
+.report-row-top { display: flex; justify-content: space-between; font-size: 12.5px; font-weight: 600; }
+.report-row-date { font-family: 'IBM Plex Mono', monospace; font-weight: 500; color: var(--ink-soft); font-size: 11px; }
+.report-row-bottom { display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-soft); margin-top: 3px; }
+`;
