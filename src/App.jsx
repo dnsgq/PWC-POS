@@ -2,7 +2,8 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Clock, LogOut, Plus, Lock, Settings, X, Check, Banknote,
   Smartphone, ChevronLeft, UserPlus, AlertCircle, Delete, ShieldCheck,
-  Users, Receipt, Trash2, CalendarClock, ChevronRight, Home, ListOrdered, FileBarChart2
+  Users, Receipt, Trash2, CalendarClock, ChevronRight, Home, ListOrdered, FileBarChart2,
+  UserMinus, PieChart, Download, TimerReset, AlertTriangle
 } from 'lucide-react';
 import { fetchEmployees, insertEmployee, updateEmployeeActive, fetchAttendance, insertAttendance, clockOutAttendance, fetchTransactions, insertTransaction, fetchClosings, upsertClosing } from './api';
 import { supabase } from './supabaseClient';
@@ -19,6 +20,7 @@ const CATEGORIES = [
   "Supplies", "Utilities", "Equipment", "Transportation", "Miscellaneous", "Pink Wallet Migration"
 ];
 const ROLES = ["Employee", "Manager", "Admin", "Owner"];
+const DISCREPANCY_THRESHOLD = 30;
 
 const peso = (n) => new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', minimumFractionDigits: 2 }).format(Number(n) || 0);
 const todayStr = (d = new Date()) => {
@@ -30,6 +32,46 @@ const timeStr = (iso) => iso ? new Date(iso).toLocaleTimeString('en-PH', { hour:
 const dateTimeStr = (iso) => iso ? new Date(iso).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
 
 const initials = (name) => (name || '?').trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase();
+
+function csvCell(v) {
+  if (v == null) return '';
+  const s = String(v);
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+function toCSV(rows, columns) {
+  const header = columns.map(c => csvCell(c.label)).join(',');
+  const lines = rows.map(r => columns.map(c => csvCell(c.value(r))).join(','));
+  return [header, ...lines].join('\n');
+}
+function downloadCSV(filename, csvString) {
+  const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function playPingSound() {
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    const ctx = new Ctx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = 880;
+    gain.gain.setValueAtTime(0.16, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.35);
+  } catch (e) { console.error('ping sound failed', e); }
+}
 
 function PinDots({ value, length = 4 }) {
   return (
@@ -70,6 +112,19 @@ export default function App() {
   const [currentEmployee, setCurrentEmployee] = useState(null);
   const [activeView, setActiveView] = useState('home');
   const [txnDateFilter, setTxnDateFilter] = useState(null);
+  const [toasts, setToasts] = useState([]);
+  const pendingIdsRef = useRef(new Set());
+
+  const pushToast = (message) => {
+    const id = `${Date.now()}-${Math.random()}`;
+    setToasts(prev => [...prev, { id, message }]);
+    playPingSound();
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4500);
+  };
+  const markOwnAction = (id) => {
+    pendingIdsRef.current.add(id);
+    setTimeout(() => pendingIdsRef.current.delete(id), 10000);
+  };
 
   const [loginPicked, setLoginPicked] = useState(null);
   const [pin, setPin] = useState('');
@@ -130,11 +185,19 @@ export default function App() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'employees' }, () => {
         fetchEmployees().then(setEmployees).catch(console.error);
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, (payload) => {
         fetchAttendance().then(setAttendance).catch(console.error);
+        if (payload.eventType === 'INSERT' && payload.new && !pendingIdsRef.current.has(payload.new.id)) {
+          pushToast(`${payload.new.employee_name} clocked in`);
+        }
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, (payload) => {
         fetchTransactions().then(setTransactions).catch(console.error);
+        if (payload.eventType === 'INSERT' && payload.new && !pendingIdsRef.current.has(payload.new.id)) {
+          const amt = Number(payload.new.amount) || 0;
+          const sign = payload.new.type === 'Cash In' ? '+' : '−';
+          pushToast(`${payload.new.created_by_name} added ${sign}${peso(amt)} (${payload.new.category})`);
+        }
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'closings' }, () => {
         fetchClosings().then(setClosings).catch(console.error);
@@ -212,6 +275,7 @@ export default function App() {
         role: currentEmployee.role, date: today, clockIn: new Date().toISOString(), clockOut: null,
       });
       setAttendance(prev => [...prev, rec]);
+      markOwnAction(rec.id);
       if (needsManualOpening) setShowOpeningEntry(true);
     } catch (err) { console.error('Clock in failed', err); }
   };
@@ -226,6 +290,12 @@ export default function App() {
       setShowOpeningEntry(false);
       resetLogin();
     } catch (err) { console.error('Clock out failed', err); }
+  };
+
+  const doLogout = () => {
+    setCurrentEmployee(null);
+    localStorage.removeItem('pwc_pos_employee_id');
+    resetLogin();
   };
 
   const saveOpeningBalances = async (cash, gcash) => {
@@ -251,6 +321,7 @@ export default function App() {
         createdByName: employees.find(e => e.id === form.createdBy)?.name || currentEmployee.name,
       };
       await insertTransaction(rec);
+      markOwnAction(rec.id);
       setTransactions(prev => [...prev, rec]);
       setShowTxn(false);
     } catch (err) { console.error('Adding transaction failed', err); }
@@ -367,6 +438,15 @@ export default function App() {
   return (
     <div className="pos-root">
       <style>{STYLES}</style>
+
+      {toasts.length > 0 && (
+        <div className="toast-stack">
+          {toasts.map(t => (
+            <div key={t.id} className="toast-item">{t.message}</div>
+          ))}
+        </div>
+      )}
+
       <div className="content-area">
 
       <div className="topbar">
@@ -404,6 +484,7 @@ export default function App() {
               ) : (
                 <button className="btn btn-danger-outline" onClick={doClockOut}><LogOut size={16} /> Clock out</button>
               )}
+              <button className="btn btn-purple" onClick={doLogout}><UserMinus size={16} /> Log out</button>
             </div>
           </div>
 
@@ -511,6 +592,10 @@ export default function App() {
         <ReportsView transactions={transactions} attendance={attendance} closings={closings} />
       )}
 
+      {activeView === 'analytics' && canSeeReports && (
+        <AnalyticsView employees={employees} attendance={attendance} transactions={transactions} closings={closings} />
+      )}
+
       </div>
 
       <div className="bottom-nav">
@@ -523,6 +608,11 @@ export default function App() {
         {canSeeReports && (
           <button className={`nav-btn ${activeView === 'reports' ? 'nav-btn-active' : ''}`} onClick={() => setActiveView('reports')}>
             <FileBarChart2 size={19} /><span>Reports</span>
+          </button>
+        )}
+        {canSeeReports && (
+          <button className={`nav-btn ${activeView === 'analytics' ? 'nav-btn-active' : ''}`} onClick={() => setActiveView('analytics')}>
+            <PieChart size={19} /><span>Analytics</span>
           </button>
         )}
       </div>
@@ -632,9 +722,44 @@ function ReportsView({ transactions, attendance, closings }) {
   const att = useMemo(() => [...attendance].sort((a, b) => (b.clockIn || '').localeCompare(a.clockIn || '')), [attendance]);
   const cls = useMemo(() => [...closings].sort((a, b) => b.date.localeCompare(a.date)), [closings]);
 
+  const discrepancies = useMemo(() => cls.filter(c =>
+    c.status === 'Closed' && (
+      Math.abs(c.cashDifference || 0) >= DISCREPANCY_THRESHOLD ||
+      Math.abs(c.gcashDifference || 0) >= DISCREPANCY_THRESHOLD
+    )
+  ), [cls]);
+
   return (
     <div className="view-panel">
       <div className="view-panel-title">Reports</div>
+
+      {discrepancies.length > 0 && (
+        <div className="receipt-panel receipt-panel-alert" style={{ marginTop: 14 }}>
+          <div className="receipt-tear receipt-tear-alert" />
+          <div className="receipt-header">
+            <AlertTriangle size={14} /> Cash discrepancies <span className="receipt-count">{discrepancies.length}</span>
+          </div>
+          <div className="receipt-list">
+            {discrepancies.map(c => (
+              <div key={c.id} className="receipt-row">
+                <div className="receipt-row-top">
+                  <span className="receipt-cat">{c.date}</span>
+                  <span className="receipt-amt">Closed by {c.closedBy}</span>
+                </div>
+                <div className="receipt-row-bottom">
+                  {Math.abs(c.cashDifference || 0) >= DISCREPANCY_THRESHOLD && (
+                    <span>Cash {c.cashDifference >= 0 ? 'over' : 'short'} by {peso(Math.abs(c.cashDifference))}</span>
+                  )}
+                  {Math.abs(c.gcashDifference || 0) >= DISCREPANCY_THRESHOLD && (
+                    <span>GCash {c.gcashDifference >= 0 ? 'over' : 'short'} by {peso(Math.abs(c.gcashDifference))}</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="receipt-tear receipt-tear-bottom receipt-tear-alert" />
+        </div>
+      )}
 
       <div className="receipt-panel" style={{ marginTop: 14 }}>
         <div className="receipt-tear" />
@@ -717,6 +842,150 @@ function ReportsView({ transactions, attendance, closings }) {
             ))}
           </div>
         )}
+        <div className="receipt-tear receipt-tear-bottom" />
+      </div>
+    </div>
+  );
+}
+
+function AnalyticsView({ employees, attendance, transactions, closings }) {
+  const hoursByEmployee = useMemo(() => {
+    const totals = {};
+    for (const a of attendance) {
+      if (!a.clockOut) continue;
+      const ms = new Date(a.clockOut) - new Date(a.clockIn);
+      if (!(ms > 0)) continue;
+      totals[a.employeeName] = (totals[a.employeeName] || 0) + ms;
+    }
+    return Object.entries(totals)
+      .map(([name, ms]) => ({ name, hours: ms / 3600000 }))
+      .sort((a, b) => b.hours - a.hours);
+  }, [attendance]);
+
+  const categoryTotals = useMemo(() => {
+    const totals = {};
+    for (const t of transactions) {
+      const signed = (t.type === 'Cash In' ? 1 : -1) * (Number(t.amount) || 0);
+      totals[t.category] = (totals[t.category] || 0) + signed;
+    }
+    const rows = Object.entries(totals).map(([category, net]) => ({ category, net }));
+    rows.sort((a, b) => Math.abs(b.net) - Math.abs(a.net));
+    return rows;
+  }, [transactions]);
+
+  const maxAbs = Math.max(1, ...categoryTotals.map(r => Math.abs(r.net)));
+
+  const formatHours = (h) => {
+    const totalMin = Math.round(h * 60);
+    const hh = Math.floor(totalMin / 60);
+    const mm = totalMin % 60;
+    return `${hh}h ${mm}m`;
+  };
+
+  const exportTransactions = () => {
+    const csv = toCSV(transactions, [
+      { label: 'ID', value: t => t.id },
+      { label: 'Date/Time', value: t => dateTimeStr(t.datetime) },
+      { label: 'Type', value: t => t.type },
+      { label: 'Destination', value: t => t.destination },
+      { label: 'Category', value: t => t.category },
+      { label: 'Amount', value: t => t.amount },
+      { label: 'Description', value: t => t.description },
+      { label: 'Notes', value: t => t.notes },
+      { label: 'Created By', value: t => t.createdByName },
+    ]);
+    downloadCSV(`transactions-${todayStr()}.csv`, csv);
+  };
+
+  const exportAttendance = () => {
+    const csv = toCSV(attendance, [
+      { label: 'Employee', value: a => a.employeeName },
+      { label: 'Role', value: a => a.role },
+      { label: 'Date', value: a => a.date },
+      { label: 'Clock In', value: a => dateTimeStr(a.clockIn) },
+      { label: 'Clock Out', value: a => a.clockOut ? dateTimeStr(a.clockOut) : 'Still clocked in' },
+    ]);
+    downloadCSV(`attendance-${todayStr()}.csv`, csv);
+  };
+
+  const exportClosings = () => {
+    const csv = toCSV(closings, [
+      { label: 'Date', value: c => c.date },
+      { label: 'Status', value: c => c.status },
+      { label: 'Opening Cash', value: c => c.openingCash },
+      { label: 'Opening GCash', value: c => c.openingGCash },
+      { label: 'Expected Cash', value: c => c.expectedCash },
+      { label: 'Counted Cash', value: c => c.countedCash },
+      { label: 'Cash Difference', value: c => c.cashDifference },
+      { label: 'Expected GCash', value: c => c.expectedGCash },
+      { label: 'Counted GCash', value: c => c.countedGCash },
+      { label: 'GCash Difference', value: c => c.gcashDifference },
+      { label: 'Closed By', value: c => c.closedBy },
+    ]);
+    downloadCSV(`daily-closings-${todayStr()}.csv`, csv);
+  };
+
+  return (
+    <div className="view-panel">
+      <div className="view-panel-title">Analytics</div>
+
+      <div className="receipt-panel" style={{ marginTop: 14 }}>
+        <div className="receipt-tear" />
+        <div className="receipt-header"><TimerReset size={14} /> Hours worked</div>
+        {hoursByEmployee.length === 0 ? (
+          <div className="empty-state">No completed shifts yet.</div>
+        ) : (
+          <div className="emp-list" style={{ padding: '4px 0' }}>
+            {hoursByEmployee.map(row => (
+              <div key={row.name} className="hours-row">
+                <span className="hours-row-name">{row.name}</span>
+                <span className="hours-row-value">{formatHours(row.hours)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="receipt-tear receipt-tear-bottom" />
+      </div>
+
+      <div className="receipt-panel" style={{ marginTop: 14 }}>
+        <div className="receipt-tear" />
+        <div className="receipt-header"><PieChart size={14} /> Category breakdown</div>
+        {categoryTotals.length === 0 ? (
+          <div className="empty-state">No transactions recorded yet.</div>
+        ) : (
+          <div className="cat-list">
+            {categoryTotals.map(row => (
+              <div key={row.category} className="cat-row">
+                <div className="cat-row-top">
+                  <span>{row.category}</span>
+                  <span className={row.net >= 0 ? 'amt-in' : 'amt-out'}>
+                    {row.net >= 0 ? '+' : '−'}{peso(Math.abs(row.net))}
+                  </span>
+                </div>
+                <div className="cat-bar-track">
+                  <div
+                    className="cat-bar-fill"
+                    style={{
+                      width: `${(Math.abs(row.net) / maxAbs) * 100}%`,
+                      background: row.net >= 0 ? 'var(--success)' : 'var(--danger)',
+                    }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="receipt-tear receipt-tear-bottom" />
+      </div>
+
+      <div className="receipt-panel" style={{ marginTop: 14 }}>
+        <div className="receipt-tear" />
+        <div className="receipt-header"><Download size={14} /> Export data</div>
+        <div className="export-btn-list">
+          <button className="btn btn-outline btn-block" onClick={exportTransactions}><Download size={14} /> Transactions CSV</button>
+          <button className="btn btn-outline btn-block" onClick={exportAttendance}><Download size={14} /> Attendance CSV</button>
+          <button className="btn btn-outline btn-block" onClick={exportClosings}><Download size={14} /> Daily closings CSV</button>
+        </div>
         <div className="receipt-tear receipt-tear-bottom" />
       </div>
     </div>
@@ -1096,7 +1365,7 @@ html, body {
 .dot { width: 8px; height: 8px; border-radius: 50%; }
 .dot-on { background: var(--success); }
 .dot-off { background: var(--ink-soft); }
-.status-actions { display: flex; gap: 8px; }
+.status-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 
 .active-strip { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 11px; color: var(--ink-soft); margin-bottom: 14px; }
 .active-strip-label { font-weight: 500; }
@@ -1113,6 +1382,7 @@ html, body {
 .btn-outline { background: #fff; border-color: var(--paper-dark); color: var(--ink); }
 .btn-danger-outline { background: #fff; border-color: var(--danger); color: var(--danger); }
 .btn-green { background: var(--success); color: #fff; }
+.btn-purple { background: var(--brand-purple); color: #fff; }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .action-row { display: flex; gap: 8px; margin-bottom: 6px; }
@@ -1135,6 +1405,27 @@ html, body {
 .receipt-panel-flat { margin-top: 0; }
 .receipt-tear { height: 10px; background-image: linear-gradient(-45deg, var(--paper) 6px, transparent 0), linear-gradient(45deg, var(--paper) 6px, transparent 0); background-size: 12px 12px; background-position: left top; background-repeat: repeat-x; margin: 0 -14px; }
 .receipt-tear-bottom { transform: rotate(180deg); margin-top: 8px; }
+
+.receipt-panel-alert { background: var(--highlight); }
+.receipt-panel-alert .receipt-header { color: #fff; }
+.receipt-panel-alert .receipt-count { color: rgba(255,255,255,0.85); }
+.receipt-panel-alert .receipt-row { border-top-color: rgba(255,255,255,0.35); }
+.receipt-panel-alert .receipt-cat { color: #fff; }
+.receipt-panel-alert .receipt-amt { color: #fff; }
+.receipt-panel-alert .receipt-row-bottom { color: rgba(255,255,255,0.9); }
+.receipt-tear-alert { background-image: linear-gradient(-45deg, var(--highlight) 6px, transparent 0), linear-gradient(45deg, var(--highlight) 6px, transparent 0); }
+
+.toast-stack {
+  position: fixed; top: 14px; left: 50%; transform: translateX(-50%); z-index: 60;
+  display: flex; flex-direction: column; gap: 6px; align-items: center; width: 92%; max-width: 440px;
+}
+.toast-item {
+  background: var(--brand-purple); color: #fff; font-size: 12.5px; font-weight: 600;
+  padding: 10px 16px; border-radius: 10px; box-shadow: 0 4px 14px rgba(36,28,31,0.25);
+  text-align: center; animation: toast-in 0.2s ease-out;
+}
+@keyframes toast-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+
 .receipt-header { display: flex; align-items: center; gap: 6px; font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 13px; padding: 10px 0 8px; }
 .receipt-count { margin-left: auto; font-family: 'IBM Plex Mono', monospace; font-weight: 500; color: var(--ink-soft); font-size: 12px; }
 .receipt-list { display: flex; flex-direction: column; }
@@ -1170,51 +1461,5 @@ html, body {
 .emp-row-info { flex: 1; }
 .emp-row-name { font-size: 13px; font-weight: 600; }
 .emp-row-role { font-size: 11px; color: var(--ink-soft); font-family: 'IBM Plex Mono', monospace; }
-.divider { height: 1px; background: var(--paper-dark); margin: 16px 0; }
 
-.close-summary { background: #fff; border: 1px solid var(--paper-dark); border-radius: 10px; padding: 10px 14px; }
-.close-row { display: flex; justify-content: space-between; font-size: 12.5px; padding: 5px 0; }
-.close-row-total { border-top: 1px dashed #C9C0AA; margin-top: 4px; padding-top: 8px; font-weight: 700; }
-.mono-val { font-family: 'IBM Plex Mono', monospace; }
-
-.denom-grid { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
-.denom-row { display: grid; grid-template-columns: 44px 1fr 80px; align-items: center; gap: 8px; }
-.denom-label { font-family: 'IBM Plex Mono', monospace; font-weight: 600; font-size: 13px; }
-.denom-input { text-align: center; }
-.denom-subtotal { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--ink-soft); text-align: right; }
-
-.diff-line { text-align: center; font-size: 12px; font-weight: 600; padding: 6px; border-radius: 8px; margin-top: 6px; }
-.diff-even { background: var(--success-bg); color: var(--success); }
-.diff-over { background: #E3F4F5; color: var(--rule-blue); }
-.diff-short { background: var(--danger-bg); color: var(--danger); }
-
-.bottom-nav {
-  display: flex; gap: 4px; margin: 16px -16px -16px; padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 0px));
-  background: #fff; border-top: 1px solid var(--paper-dark); border-radius: 0 0 16px 16px;
-  position: sticky; bottom: 0;
-}
-.nav-btn {
-  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 7px 4px;
-  background: none; border: none; border-radius: 10px; color: var(--ink-soft); font-family: inherit; font-size: 10.5px; font-weight: 600; cursor: pointer;
-}
-.nav-btn-active { color: var(--rule-blue); background: #E3F4F5; }
-
-.view-panel { padding-bottom: 4px; }
-.view-panel-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
-.view-panel-title { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 18px; }
-.clear-filter-link { background: none; border: none; color: var(--rule-blue); font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; }
-
-.view-more-link {
-  width: 100%; background: none; border: none; color: var(--rule-blue); font-size: 12px; font-weight: 600;
-  cursor: pointer; font-family: inherit; display: flex; align-items: center; justify-content: center; gap: 3px; padding: 8px 0 2px;
-}
-
-.date-group { margin-top: 16px; }
-.date-group:first-child { margin-top: 8px; }
-.date-group-heading { font-size: 12px; font-weight: 700; color: var(--ink-soft); margin-bottom: 6px; padding-left: 2px; }
-
-.report-row { background: #fff; border: 1px solid var(--paper-dark); border-radius: 10px; padding: 9px 12px; }
-.report-row-top { display: flex; justify-content: space-between; font-size: 12.5px; font-weight: 600; }
-.report-row-date { font-family: 'IBM Plex Mono', monospace; font-weight: 500; color: var(--ink-soft); font-size: 11px; }
-.report-row-bottom { display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-soft); margin-top: 3px; }
-`;
+.hours-row { display: flex; justify-content: space-between; align-items
