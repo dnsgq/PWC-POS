@@ -973,6 +973,11 @@ function ClosedReceiptModal({ record, onClose }) {
 const STYLES = `
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap');
 
+html, body {
+  margin: 0;
+  background: #F2E3CE;
+}
+
 .pos-root {
   --paper: #FDF4EB;
   --paper-dark: #F2E3CE;
@@ -998,6 +1003,16 @@ const STYLES = `
   display: flex;
   flex-direction: column;
 }
+
+@media (min-width: 700px) {
+  .pos-root { max-width: 640px; margin: 16px auto; min-height: calc(100dvh - 32px); box-shadow: 0 4px 24px rgba(36,28,31,0.08); }
+}
+@media (min-width: 1024px) {
+  .pos-root { max-width: 760px; }
+  .summary-grid { grid-template-columns: 1fr 1fr; }
+  .employee-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
 .pos-root * { box-sizing: border-box; }
 .pos-loading { display: flex; align-items: center; justify-content: center; min-height: 200px; }
 .content-area { flex: 1 1 auto; display: flex; flex-direction: column; }
