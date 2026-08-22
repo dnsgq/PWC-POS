@@ -60,11 +60,31 @@ function downloadCSV(filename, csvString) {
   URL.revokeObjectURL(url);
 }
 
+let sharedAudioCtx = null;
+function getAudioCtx() {
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  if (!Ctx) return null;
+  if (!sharedAudioCtx) sharedAudioCtx = new Ctx();
+  return sharedAudioCtx;
+}
+// iOS Safari (both in the browser and as an installed home-screen app) refuses
+// to let a webpage create or play audio unless it happens as a direct result
+// of a real tap. It does NOT extend that permission to sounds triggered later
+// by background events (like a ping arriving). The fix: create/resume the
+// AudioContext once, during the very first tap anywhere in the app, and keep
+// reusing that same unlocked context for every later ping.
+function unlockAudioForIOS() {
+  const ctx = getAudioCtx();
+  if (ctx && ctx.state === 'suspended') {
+    ctx.resume().catch(() => {});
+  }
+}
+
 function playPingSound() {
   try {
-    const Ctx = window.AudioContext || window.webkitAudioContext;
-    if (!Ctx) return;
-    const ctx = new Ctx();
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    if (ctx.state === 'suspended') { ctx.resume().catch(() => {}); }
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.type = 'sine';
@@ -110,6 +130,20 @@ export default function App() {
   const [loaded, setLoaded] = useState(false);
   const [employees, setEmployees] = useState([]);
   const [attendance, setAttendance] = useState([]);
+
+  useEffect(() => {
+    const unlock = () => {
+      unlockAudioForIOS();
+      document.removeEventListener('pointerdown', unlock);
+      document.removeEventListener('touchstart', unlock);
+    };
+    document.addEventListener('pointerdown', unlock, { once: true });
+    document.addEventListener('touchstart', unlock, { once: true });
+    return () => {
+      document.removeEventListener('pointerdown', unlock);
+      document.removeEventListener('touchstart', unlock);
+    };
+  }, []);
   const [transactions, setTransactions] = useState([]);
   const [closings, setClosings] = useState([]);
 
@@ -121,6 +155,8 @@ export default function App() {
   const pendingIdsRef = useRef(new Set());
   const knownAttendanceIdsRef = useRef(null);
   const knownTransactionIdsRef = useRef(null);
+  const knownClosingsRef = useRef(null);
+  const currentEmployeeRef = useRef(null);
 
   const pushToast = (message) => {
     const id = `${Date.now()}-${Math.random()}`;
@@ -174,14 +210,42 @@ export default function App() {
     setTransactions(rows);
   };
 
+  const syncClosings = async () => {
+    const rows = await fetchClosings();
+    const me = currentEmployeeRef.current;
+    const iCanSeeDiscrepancies = me && (me.role === 'Admin' || me.role === 'Owner');
+    if (knownClosingsRef.current) {
+      for (const c of rows) {
+        const prevStatus = knownClosingsRef.current.get(c.id);
+        const justClosed = c.status === 'Closed' && prevStatus !== 'Closed';
+        const hasDiscrepancy = Math.abs(c.cashDifference || 0) >= DISCREPANCY_THRESHOLD || Math.abs(c.gcashDifference || 0) >= DISCREPANCY_THRESHOLD;
+        if (justClosed && hasDiscrepancy && iCanSeeDiscrepancies && !pendingIdsRef.current.has(c.id)) {
+          const parts = [];
+          if (Math.abs(c.cashDifference || 0) >= DISCREPANCY_THRESHOLD) {
+            parts.push(`cash ${c.cashDifference >= 0 ? 'over' : 'short'} by ${peso(Math.abs(c.cashDifference))}`);
+          }
+          if (Math.abs(c.gcashDifference || 0) >= DISCREPANCY_THRESHOLD) {
+            parts.push(`GCash ${c.gcashDifference >= 0 ? 'over' : 'short'} by ${peso(Math.abs(c.gcashDifference))}`);
+          }
+          pushToast(`Discrepancy on ${c.date}: ${parts.join(' · ')}`);
+        }
+      }
+    }
+    knownClosingsRef.current = new Map(rows.map(c => [c.id, c.status]));
+    setClosings(rows);
+  };
+
+  useEffect(() => {
+    currentEmployeeRef.current = currentEmployee;
+  }, [currentEmployee]);
+
   useEffect(() => {
     (async () => {
       try {
-        const [e, , , c] = await Promise.all([
-          fetchEmployees(), syncAttendance(), syncTransactions(), fetchClosings(),
+        const [e] = await Promise.all([
+          fetchEmployees(), syncAttendance(), syncTransactions(), syncClosings(),
         ]);
         setEmployees(e);
-        setClosings(c);
         const savedId = localStorage.getItem('pwc_pos_employee_id');
         if (savedId) {
           const savedEmployee = e.find(emp => emp.id === savedId && emp.active !== false);
@@ -203,16 +267,17 @@ export default function App() {
 
   // Live sync: pick up changes made from other devices/tabs.
   // Both the realtime subscription AND the periodic poll below call the same
-  // syncAttendance/syncTransactions functions, which detect new rows by
-  // comparing IDs against what we've already seen - this way the ping/toast
-  // fires reliably even if the realtime WebSocket connection is flaky,
-  // since the poll acts as a guaranteed fallback using the same detection logic.
+  // syncAttendance/syncTransactions/syncClosings functions, which detect new
+  // or changed rows by comparing against what we've already seen - this way
+  // the ping/toast fires reliably even if the realtime WebSocket connection
+  // is flaky, since the poll acts as a guaranteed fallback using the same
+  // detection logic.
   useEffect(() => {
     const refreshAll = () => {
       fetchEmployees().then(setEmployees).catch(console.error);
       syncAttendance().catch(console.error);
       syncTransactions().catch(console.error);
-      fetchClosings().then(setClosings).catch(console.error);
+      syncClosings().catch(console.error);
     };
 
     const channel = supabase.channel('pos-changes')
@@ -226,7 +291,7 @@ export default function App() {
         syncTransactions().catch(console.error);
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'closings' }, () => {
-        fetchClosings().then(setClosings).catch(console.error);
+        syncClosings().catch(console.error);
       })
       .subscribe((status) => {
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
@@ -374,6 +439,7 @@ export default function App() {
         status: 'Closed', closedBy: currentEmployee.name, closedAt: new Date().toISOString(),
       };
       const saved = await upsertClosing(finalRec);
+      markOwnAction(saved.id);
       setClosings(prev => [...prev.filter(c => c.date !== today), saved]);
       setShowCashCount(false);
       setShowCloseDay(false);
