@@ -27,6 +27,11 @@ const todayStr = (d = new Date()) => {
   const dt = new Date(d);
   return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
 };
+// Transaction timestamps are stored as UTC ISO strings. Slicing the first 10
+// characters gives the UTC calendar date, which is WRONG for a shop in a
+// UTC+8 timezone during local midnight-8am (it would still show yesterday's
+// UTC date). This always converts to the device's local calendar date instead.
+const localDateKey = (iso) => todayStr(new Date(iso));
 const uid = (p = 'ID') => `${p}-${Date.now().toString(36).slice(-6)}${Math.random().toString(36).slice(2, 5)}`.toUpperCase();
 const timeStr = (iso) => iso ? new Date(iso).toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' }) : '';
 const dateTimeStr = (iso) => iso ? new Date(iso).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
@@ -223,7 +228,7 @@ export default function App() {
   const isClockedIn = !!myAttendance;
 
   const todaysTxns = useMemo(
-    () => transactions.filter(t => t.datetime.slice(0, 10) === today).sort((a, b) => b.datetime.localeCompare(a.datetime)),
+    () => transactions.filter(t => localDateKey(t.datetime) === today).sort((a, b) => b.datetime.localeCompare(a.datetime)),
     [transactions, today]
   );
 
@@ -675,8 +680,8 @@ function dateHeading(dateStr) {
 
 function TransactionsView({ transactions, dateFilter, onClearFilter }) {
   const sorted = useMemo(() => [...transactions].sort((a, b) => b.datetime.localeCompare(a.datetime)), [transactions]);
-  const filtered = dateFilter ? sorted.filter(t => t.datetime.slice(0, 10) === dateFilter) : sorted;
-  const groups = useMemo(() => groupByDate(filtered, t => t.datetime.slice(0, 10)), [filtered]);
+  const filtered = dateFilter ? sorted.filter(t => localDateKey(t.datetime) === dateFilter) : sorted;
+  const groups = useMemo(() => groupByDate(filtered, t => localDateKey(t.datetime)), [filtered]);
 
   return (
     <div className="view-panel">
