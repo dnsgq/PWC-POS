@@ -95,6 +95,12 @@ export default function App() {
         setAttendance(a);
         setTransactions(t);
         setClosings(c);
+        const savedId = localStorage.getItem('pwc_pos_employee_id');
+        if (savedId) {
+          const savedEmployee = e.find(emp => emp.id === savedId && emp.active !== false);
+          if (savedEmployee) setCurrentEmployee(savedEmployee);
+          else localStorage.removeItem('pwc_pos_employee_id');
+        }
       } catch (err) {
         console.error('Failed to load data from Supabase', err);
       } finally {
@@ -108,8 +114,18 @@ export default function App() {
     return () => clearInterval(t);
   }, []);
 
-  // Live sync: pick up changes made from other devices/tabs
+  // Live sync: pick up changes made from other devices/tabs.
+  // Realtime pushes updates instantly when it fires; the polling fallback
+  // below guarantees data still refreshes even if a realtime event is missed,
+  // without ever needing a manual page reload (which would log the device out).
   useEffect(() => {
+    const refreshAll = () => {
+      fetchEmployees().then(setEmployees).catch(console.error);
+      fetchAttendance().then(setAttendance).catch(console.error);
+      fetchTransactions().then(setTransactions).catch(console.error);
+      fetchClosings().then(setClosings).catch(console.error);
+    };
+
     const channel = supabase.channel('pos-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'employees' }, () => {
         fetchEmployees().then(setEmployees).catch(console.error);
@@ -124,7 +140,10 @@ export default function App() {
         fetchClosings().then(setClosings).catch(console.error);
       })
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+
+    const pollInterval = setInterval(refreshAll, 12000);
+
+    return () => { supabase.removeChannel(channel); clearInterval(pollInterval); };
   }, []);
 
 
@@ -176,6 +195,7 @@ export default function App() {
     if (nextPin.length === 4) {
       if (loginPicked.pin === nextPin) {
         setCurrentEmployee(loginPicked);
+        localStorage.setItem('pwc_pos_employee_id', loginPicked.id);
         resetLogin();
       } else {
         setLoginError('Incorrect PIN');
@@ -202,6 +222,7 @@ export default function App() {
       await clockOutAttendance(myAttendance.id, clockOutIso);
       setAttendance(prev => prev.map(a => a.id === myAttendance.id ? { ...a, clockOut: clockOutIso } : a));
       setCurrentEmployee(null);
+      localStorage.removeItem('pwc_pos_employee_id');
       setShowOpeningEntry(false);
       resetLogin();
     } catch (err) { console.error('Clock out failed', err); }
