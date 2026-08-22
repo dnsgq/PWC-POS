@@ -119,6 +119,8 @@ export default function App() {
   const [txnDateFilter, setTxnDateFilter] = useState(null);
   const [toasts, setToasts] = useState([]);
   const pendingIdsRef = useRef(new Set());
+  const knownAttendanceIdsRef = useRef(null);
+  const knownTransactionIdsRef = useRef(null);
 
   const pushToast = (message) => {
     const id = `${Date.now()}-${Math.random()}`;
@@ -145,15 +147,40 @@ export default function App() {
   const [closingDraft, setClosingDraft] = useState(null);
   const [closedReceipt, setClosedReceipt] = useState(null);
 
+  const syncAttendance = async () => {
+    const rows = await fetchAttendance();
+    if (knownAttendanceIdsRef.current) {
+      for (const a of rows) {
+        if (!knownAttendanceIdsRef.current.has(a.id) && !pendingIdsRef.current.has(a.id)) {
+          pushToast(`${a.employeeName} clocked in`);
+        }
+      }
+    }
+    knownAttendanceIdsRef.current = new Set(rows.map(a => a.id));
+    setAttendance(rows);
+  };
+
+  const syncTransactions = async () => {
+    const rows = await fetchTransactions();
+    if (knownTransactionIdsRef.current) {
+      for (const t of rows) {
+        if (!knownTransactionIdsRef.current.has(t.id) && !pendingIdsRef.current.has(t.id)) {
+          const sign = t.type === 'Cash In' ? '+' : '−';
+          pushToast(`${t.createdByName} added ${sign}${peso(t.amount)} (${t.category})`);
+        }
+      }
+    }
+    knownTransactionIdsRef.current = new Set(rows.map(t => t.id));
+    setTransactions(rows);
+  };
+
   useEffect(() => {
     (async () => {
       try {
-        const [e, a, t, c] = await Promise.all([
-          fetchEmployees(), fetchAttendance(), fetchTransactions(), fetchClosings(),
+        const [e, , , c] = await Promise.all([
+          fetchEmployees(), syncAttendance(), syncTransactions(), fetchClosings(),
         ]);
         setEmployees(e);
-        setAttendance(a);
-        setTransactions(t);
         setClosings(c);
         const savedId = localStorage.getItem('pwc_pos_employee_id');
         if (savedId) {
@@ -175,14 +202,16 @@ export default function App() {
   }, []);
 
   // Live sync: pick up changes made from other devices/tabs.
-  // Realtime pushes updates instantly when it fires; the polling fallback
-  // below guarantees data still refreshes even if a realtime event is missed,
-  // without ever needing a manual page reload (which would log the device out).
+  // Both the realtime subscription AND the periodic poll below call the same
+  // syncAttendance/syncTransactions functions, which detect new rows by
+  // comparing IDs against what we've already seen - this way the ping/toast
+  // fires reliably even if the realtime WebSocket connection is flaky,
+  // since the poll acts as a guaranteed fallback using the same detection logic.
   useEffect(() => {
     const refreshAll = () => {
       fetchEmployees().then(setEmployees).catch(console.error);
-      fetchAttendance().then(setAttendance).catch(console.error);
-      fetchTransactions().then(setTransactions).catch(console.error);
+      syncAttendance().catch(console.error);
+      syncTransactions().catch(console.error);
       fetchClosings().then(setClosings).catch(console.error);
     };
 
@@ -190,26 +219,22 @@ export default function App() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'employees' }, () => {
         fetchEmployees().then(setEmployees).catch(console.error);
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, (payload) => {
-        fetchAttendance().then(setAttendance).catch(console.error);
-        if (payload.eventType === 'INSERT' && payload.new && !pendingIdsRef.current.has(payload.new.id)) {
-          pushToast(`${payload.new.employee_name} clocked in`);
-        }
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, () => {
+        syncAttendance().catch(console.error);
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, (payload) => {
-        fetchTransactions().then(setTransactions).catch(console.error);
-        if (payload.eventType === 'INSERT' && payload.new && !pendingIdsRef.current.has(payload.new.id)) {
-          const amt = Number(payload.new.amount) || 0;
-          const sign = payload.new.type === 'Cash In' ? '+' : '−';
-          pushToast(`${payload.new.created_by_name} added ${sign}${peso(amt)} (${payload.new.category})`);
-        }
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, () => {
+        syncTransactions().catch(console.error);
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'closings' }, () => {
         fetchClosings().then(setClosings).catch(console.error);
       })
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.error('Realtime subscription issue:', status, '- falling back to periodic polling only.');
+        }
+      });
 
-    const pollInterval = setInterval(refreshAll, 12000);
+    const pollInterval = setInterval(refreshAll, 6000);
 
     return () => { supabase.removeChannel(channel); clearInterval(pollInterval); };
   }, []);
