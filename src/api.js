@@ -25,6 +25,7 @@ const clsFromDb = (r) => ({
   countedGCash: r.counted_gcash != null ? Number(r.counted_gcash) : null,
   gcashDifference: r.gcash_difference != null ? Number(r.gcash_difference) : null,
   denominations: r.denominations, status: r.status, closedBy: r.closed_by, closedAt: r.closed_at,
+  notes: r.notes, photoUrl: r.photo_url,
 });
 
 // ---- employees ----
@@ -110,6 +111,7 @@ export async function upsertClosing(c) {
     counted_gcash: c.countedGCash ?? null, gcash_difference: c.gcashDifference ?? null,
     denominations: c.denominations ?? null, status: c.status,
     closed_by: c.closedBy ?? null, closed_at: c.closedAt ?? null,
+    notes: c.notes ?? null, photo_url: c.photoUrl ?? null,
   };
   const { data, error } = await supabase
     .from('closings')
@@ -118,6 +120,15 @@ export async function upsertClosing(c) {
     .single();
   if (error) throw error;
   return clsFromDb(data);
+}
+
+export async function uploadClosingPhoto(file, keyHint) {
+  const ext = (file.name && file.name.includes('.')) ? file.name.split('.').pop() : 'jpg';
+  const path = `${keyHint}-${Date.now()}.${ext}`;
+  const { error } = await supabase.storage.from('closing-photos').upload(path, file, { upsert: true });
+  if (error) throw error;
+  const { data } = supabase.storage.from('closing-photos').getPublicUrl(path);
+  return data.publicUrl;
 }
 
 // ---- push subscriptions ----
@@ -145,3 +156,4 @@ export async function deletePushSubscription(endpoint) {
   const { error } = await supabase.from('push_subscriptions').delete().eq('endpoint', endpoint);
   if (error) throw error;
 }
+
