@@ -5,7 +5,7 @@ import {
   Users, Receipt, Trash2, CalendarClock, ChevronRight, Home, ListOrdered, FileBarChart2,
   UserMinus, PieChart, Download, TimerReset, AlertTriangle
 } from 'lucide-react';
-import { fetchEmployees, insertEmployee, updateEmployeeActive, fetchAttendance, insertAttendance, clockOutAttendance, fetchTransactions, insertTransaction, fetchClosings, upsertClosing, fetchPushSubscriptionForEndpoint, savePushSubscription, deletePushSubscription } from './api';
+import { fetchEmployees, insertEmployee, updateEmployeeActive, fetchAttendance, insertAttendance, clockOutAttendance, fetchTransactions, insertTransaction, fetchClosings, upsertClosing, fetchPushSubscriptionForEndpoint, savePushSubscription, deletePushSubscription, uploadClosingPhoto } from './api';
 import { supabase } from './supabaseClient';
 
 const LOGO_ICON = 'data:image/jpeg;base64,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';
@@ -491,14 +491,18 @@ export default function App() {
     setShowCloseDay(true);
   };
 
-  const confirmCashCount = async (denomCounts, countedGCash) => {
+  const [closeCountError, setCloseCountError] = useState('');
+
+  const confirmCashCount = async (denomCounts, countedGCash, notes, photoFile) => {
+    setCloseCountError('');
     try {
       const countedCash = DENOMINATIONS.reduce((sum, d) => sum + d * (Number(denomCounts[d]) || 0), 0);
+      const photoUrl = await uploadClosingPhoto(photoFile, `closing-${today}`);
       const finalRec = {
         date: today, openingCash, openingGCash, expectedCash, expectedGCash,
         countedCash, cashDifference: countedCash - expectedCash,
         countedGCash: Number(countedGCash) || 0, gcashDifference: (Number(countedGCash) || 0) - expectedGCash,
-        denominations: denomCounts,
+        denominations: denomCounts, notes: notes || null, photoUrl,
         status: 'Closed', closedBy: currentEmployee.name, closedAt: new Date().toISOString(),
       };
       const saved = await upsertClosing(finalRec);
@@ -507,7 +511,10 @@ export default function App() {
       setShowCashCount(false);
       setShowCloseDay(false);
       setClosedReceipt(saved);
-    } catch (err) { console.error('Confirming cash count failed', err); }
+    } catch (err) {
+      console.error('Confirming cash count failed', err);
+      setCloseCountError('Something went wrong saving the cash count. Please try again.');
+    }
   };
 
   const addEmployee = async (form) => {
@@ -807,7 +814,8 @@ export default function App() {
         <CashCountModal
           expectedCash={expectedCash}
           expectedGCash={expectedGCash}
-          onClose={() => setShowCashCount(false)}
+          externalError={closeCountError}
+          onClose={() => { setShowCashCount(false); setCloseCountError(''); }}
           onConfirm={confirmCashCount}
         />
       )}
@@ -991,10 +999,14 @@ function ReportsView({ transactions, attendance, closings }) {
                   <span className="report-row-date">{c.status}</span>
                 </div>
                 {c.status === 'Closed' ? (
-                  <div className="receipt-row-bottom">
-                    <span>Counted {peso(c.countedCash)} · Diff {c.cashDifference >= 0 ? '+' : '−'}{peso(Math.abs(c.cashDifference))}</span>
-                    <span>Closed by {c.closedBy}</span>
-                  </div>
+                  <>
+                    <div className="receipt-row-bottom">
+                      <span>Counted {peso(c.countedCash)} · Diff {c.cashDifference >= 0 ? '+' : '−'}{peso(Math.abs(c.cashDifference))}</span>
+                      <span>Closed by {c.closedBy}</span>
+                    </div>
+                    {c.notes && <div className="closing-note-inline">{c.notes}</div>}
+                    {c.photoUrl && <a href={c.photoUrl} target="_blank" rel="noreferrer" className="photo-link">View drawer photo</a>}
+                  </>
                 ) : (
                   <div className="receipt-row-bottom"><span>Opening {peso(c.openingCash)} · not yet closed</span></div>
                 )}
@@ -1389,12 +1401,57 @@ function CloseDayModal({ draft, expectedCash, expectedGCash, sums, onClose, onPr
   );
 }
 
-function CashCountModal({ expectedCash, expectedGCash, onClose, onConfirm }) {
+function CashCountModal({ expectedCash, expectedGCash, externalError, onClose, onConfirm }) {
   const [counts, setCounts] = useState(() => Object.fromEntries(DENOMINATIONS.map(d => [d, ''])));
   const [gcash, setGcash] = useState(String(expectedGCash.toFixed(2)));
+  const [notes, setNotes] = useState('');
+  const [confirmChecked, setConfirmChecked] = useState(false);
+  const [photoFile, setPhotoFile] = useState(null);
+  const [photoPreview, setPhotoPreview] = useState('');
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (externalError) {
+      setError(externalError);
+      setSubmitting(false);
+    }
+  }, [externalError]);
 
   const total = DENOMINATIONS.reduce((sum, d) => sum + d * (Number(counts[d]) || 0), 0);
   const diff = total - expectedCash;
+  const gcashDiff = (Number(gcash) || 0) - expectedGCash;
+  const hasAnyDiscrepancy = diff !== 0 || gcashDiff !== 0;
+  const hasLargeDiscrepancy = Math.abs(diff) >= DISCREPANCY_THRESHOLD || Math.abs(gcashDiff) >= DISCREPANCY_THRESHOLD;
+
+  const handlePhotoChange = (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    setPhotoFile(file);
+    setPhotoPreview(URL.createObjectURL(file));
+  };
+
+  const handleConfirm = () => {
+    setError('');
+    if (total === 0) {
+      setError('You haven\u2019t entered any denominations yet — count the drawer before confirming.');
+      return;
+    }
+    if (!photoFile) {
+      setError('Attach a photo of the counted drawer before confirming.');
+      return;
+    }
+    if (hasAnyDiscrepancy && !notes.trim()) {
+      setError('There\u2019s a difference from the expected amount — add a short note explaining it.');
+      return;
+    }
+    if (hasLargeDiscrepancy && !confirmChecked) {
+      setError('Please check the box confirming you recounted before continuing.');
+      return;
+    }
+    setSubmitting(true);
+    onConfirm(counts, gcash, notes.trim(), photoFile);
+  };
 
   return (
     <Modal title="Cash count" onClose={onClose}>
@@ -1424,8 +1481,28 @@ function CashCountModal({ expectedCash, expectedGCash, onClose, onConfirm }) {
       <label className="field-label" style={{ marginTop: 12 }}>Confirmed GCash balance</label>
       <input className="field-input mono-input" type="number" min="0" step="0.01" value={gcash} onChange={e => setGcash(e.target.value)} />
 
-      <button className="btn btn-highlight btn-block" style={{ marginTop: 14 }} onClick={() => onConfirm(counts, gcash)}>
-        <Check size={16} /> Confirm cash count
+      <label className="field-label">Photo of the counted drawer</label>
+      <input className="field-input" type="file" accept="image/*" capture="environment" onChange={handlePhotoChange} />
+      {photoPreview && <img src={photoPreview} alt="Counted drawer" className="photo-preview" />}
+
+      {hasAnyDiscrepancy && (
+        <>
+          <label className="field-label">Note explaining the difference</label>
+          <textarea className="field-input" rows={2} value={notes} onChange={e => setNotes(e.target.value)} placeholder="e.g. gave change from own pocket, short till at shift start..." />
+        </>
+      )}
+
+      {hasLargeDiscrepancy && (
+        <label className="confirm-checkbox-row">
+          <input type="checkbox" checked={confirmChecked} onChange={e => setConfirmChecked(e.target.checked)} />
+          <span>I recounted the drawer and confirm this is accurate.</span>
+        </label>
+      )}
+
+      {error && <div className="error-line"><AlertCircle size={14} /> {error}</div>}
+
+      <button className="btn btn-highlight btn-block" style={{ marginTop: 14 }} onClick={handleConfirm} disabled={submitting}>
+        <Check size={16} /> {submitting ? 'Saving…' : 'Confirm cash count'}
       </button>
     </Modal>
   );
@@ -1451,6 +1528,15 @@ function ClosedReceiptModal({ record, onClose }) {
         </div>
         <div className="receipt-tear receipt-tear-bottom" />
       </div>
+      {record.notes && (
+        <div className="closing-note">
+          <div className="closing-note-label">Note</div>
+          <div>{record.notes}</div>
+        </div>
+      )}
+      {record.photoUrl && (
+        <img src={record.photoUrl} alt="Counted drawer" className="photo-preview" />
+      )}
       <button className="btn btn-highlight btn-block" style={{ marginTop: 14 }} onClick={onClose}><Check size={16} /> Done</button>
     </Modal>
   );
@@ -1708,6 +1794,17 @@ html, body {
 .diff-even { background: var(--success-bg); color: var(--success); }
 .diff-over { background: #E3F4F5; color: var(--rule-blue); }
 .diff-short { background: var(--danger-bg); color: var(--danger); }
+
+.photo-preview { width: 100%; max-height: 220px; object-fit: cover; border-radius: 10px; margin-top: 8px; border: 1px solid var(--paper-dark); }
+.confirm-checkbox-row { display: flex; align-items: flex-start; gap: 8px; margin-top: 12px; font-size: 12.5px; color: var(--ink); cursor: pointer; }
+.confirm-checkbox-row input { margin-top: 2px; width: 16px; height: 16px; flex-shrink: 0; }
+
+.closing-note { background: var(--paper-dark); border-radius: 10px; padding: 10px 14px; margin-top: 12px; font-size: 12.5px; }
+.closing-note-label { font-weight: 700; font-size: 11px; color: var(--ink-soft); margin-bottom: 3px; }
+.closing-note-inline { font-size: 11px; color: var(--ink-soft); margin-top: 3px; font-style: italic; }
+.photo-link { display: inline-block; font-size: 11px; color: var(--rule-blue); font-weight: 600; margin-top: 4px; }
+
+
 
 .bottom-nav {
   display: flex; gap: 4px; margin: 16px -16px -16px; padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 0px));
