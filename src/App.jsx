@@ -270,21 +270,27 @@ export default function App() {
   const syncClosings = async () => {
     const rows = await fetchClosings();
     const me = currentEmployeeRef.current;
+    const iCanManage = me && ['Manager', 'Admin', 'Owner'].includes(me.role);
     const iCanSeeDiscrepancies = me && (me.role === 'Admin' || me.role === 'Owner');
     if (knownClosingsRef.current) {
       for (const c of rows) {
         const prevStatus = knownClosingsRef.current.get(c.id);
         const justClosed = c.status === 'Closed' && prevStatus !== 'Closed';
-        const hasDiscrepancy = Math.abs(c.cashDifference || 0) >= DISCREPANCY_THRESHOLD || Math.abs(c.gcashDifference || 0) >= DISCREPANCY_THRESHOLD;
-        if (justClosed && hasDiscrepancy && iCanSeeDiscrepancies && !pendingIdsRef.current.has(c.id)) {
-          const parts = [];
-          if (Math.abs(c.cashDifference || 0) >= DISCREPANCY_THRESHOLD) {
-            parts.push(`cash ${c.cashDifference >= 0 ? 'over' : 'short'} by ${peso(Math.abs(c.cashDifference))}`);
+        if (justClosed && !pendingIdsRef.current.has(c.id)) {
+          if (iCanManage) {
+            pushToast(`Day closed: ${c.date} closed by ${c.closedBy}`);
           }
-          if (Math.abs(c.gcashDifference || 0) >= DISCREPANCY_THRESHOLD) {
-            parts.push(`GCash ${c.gcashDifference >= 0 ? 'over' : 'short'} by ${peso(Math.abs(c.gcashDifference))}`);
+          const hasDiscrepancy = Math.abs(c.cashDifference || 0) >= DISCREPANCY_THRESHOLD || Math.abs(c.gcashDifference || 0) >= DISCREPANCY_THRESHOLD;
+          if (hasDiscrepancy && iCanSeeDiscrepancies) {
+            const parts = [];
+            if (Math.abs(c.cashDifference || 0) >= DISCREPANCY_THRESHOLD) {
+              parts.push(`cash ${c.cashDifference >= 0 ? 'over' : 'short'} by ${peso(Math.abs(c.cashDifference))}`);
+            }
+            if (Math.abs(c.gcashDifference || 0) >= DISCREPANCY_THRESHOLD) {
+              parts.push(`GCash ${c.gcashDifference >= 0 ? 'over' : 'short'} by ${peso(Math.abs(c.gcashDifference))}`);
+            }
+            pushToast(`Discrepancy on ${c.date}: ${parts.join(' · ')}`);
           }
-          pushToast(`Discrepancy on ${c.date}: ${parts.join(' · ')}`);
         }
       }
     }
