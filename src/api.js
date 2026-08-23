@@ -119,3 +119,88 @@ export async function upsertClosing(c) {
   if (error) throw error;
   return clsFromDb(data);
 }
+
+// ---- push subscriptions ----
+
+export async function fetchPushSubscriptionForEndpoint(endpoint) {
+  const { data, error } = await supabase.from('push_subscriptions').select('*').eq('endpoint', endpoint).maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+export async function savePushSubscription({ employeeId, employeeName, role, subscription }) {
+  const json = subscription.toJSON();
+  const { error } = await supabase.from('push_subscriptions').upsert({
+    employee_id: employeeId,
+    employee_name: employeeName,
+    role,
+    endpoint: json.endpoint,
+    p256dh: json.keys.p256dh,
+    auth: json.keys.auth,
+  }, { onConflict: 'endpoint' });
+  if (error) throw error;
+}
+
+export async function deletePushSubscription(endpoint) {
+  const { error } = await supabase.from('push_subscriptions').delete().eq('endpoint', endpoint);
+  if (error) throw error;
+}
+    .from('attendance')
+    .insert({
+      employee_id: a.employeeId, employee_name: a.employeeName, role: a.role,
+      date: a.date, clock_in: a.clockIn, clock_out: a.clockOut,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return attFromDb(data);
+}
+
+export async function clockOutAttendance(id, clockOutIso) {
+  const { error } = await supabase.from('attendance').update({ clock_out: clockOutIso }).eq('id', id);
+  if (error) throw error;
+}
+
+// ---- transactions ----
+
+export async function fetchTransactions() {
+  const { data, error } = await supabase.from('transactions').select('*');
+  if (error) throw error;
+  return data.map(txnFromDb);
+}
+
+export async function insertTransaction(t) {
+  const { error } = await supabase.from('transactions').insert({
+    id: t.id, amount: t.amount, description: t.description, type: t.type,
+    destination: t.destination, category: t.category, datetime: t.datetime, notes: t.notes,
+    created_by: t.createdBy, created_by_name: t.createdByName,
+  });
+  if (error) throw error;
+}
+
+// ---- closings ----
+
+export async function fetchClosings() {
+  const { data, error } = await supabase.from('closings').select('*');
+  if (error) throw error;
+  return data.map(clsFromDb);
+}
+
+export async function upsertClosing(c) {
+  const payload = {
+    date: c.date,
+    opening_cash: c.openingCash, opening_gcash: c.openingGCash,
+    expected_cash: c.expectedCash ?? null, expected_gcash: c.expectedGCash ?? null,
+    counted_cash: c.countedCash ?? null, cash_difference: c.cashDifference ?? null,
+    counted_gcash: c.countedGCash ?? null, gcash_difference: c.gcashDifference ?? null,
+    denominations: c.denominations ?? null, status: c.status,
+    closed_by: c.closedBy ?? null, closed_at: c.closedAt ?? null,
+  };
+  const { data, error } = await supabase
+    .from('closings')
+    .upsert(payload, { onConflict: 'date' })
+    .select()
+    .single();
+  if (error) throw error;
+  return clsFromDb(data);
+}
