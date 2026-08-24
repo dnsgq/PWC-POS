@@ -153,6 +153,16 @@ function playPingSound() {
     }
   } catch (e) { console.error('ping sound failed', e); }
 }
+function playPingSound() {
+  try {
+    const el = getAudioEl();
+    el.currentTime = 0;
+    const playAttempt = el.play();
+    if (playAttempt && typeof playAttempt.catch === 'function') {
+      playAttempt.catch((e) => console.error('ping sound failed', e));
+    }
+  } catch (e) { console.error('ping sound failed', e); }
+}
 
 
 function PinDots({ value, length = 4 }) {
@@ -342,7 +352,7 @@ export default function App() {
       syncTransactions().catch(console.error);
       syncClosings().catch(console.error);
     };
-
+    
     const channel = supabase.channel('pos-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'employees' }, () => {
         fetchEmployees().then(setEmployees).catch(console.error);
@@ -402,12 +412,88 @@ export default function App() {
 
   const todaysClosing = useMemo(() => closings.find(c => c.date === today), [closings, today]);
 
-  const openingCash = todaysClosing ? todaysClosing.openingCash : (lastClosedClosing ? lastClosedClosing.countedCash : 0);
-  const openingGCash = todaysClosing ? todaysClosing.openingGCash : (lastClosedClosing ? lastClosedClosing.countedGCash : 0);
+  // Carries the running cash/GCash balance forward from the last CLOSED day,
+  // folding in every transaction dated after that close and before
+  // targetDate - even on days that were never formally closed. This keeps
+  // the running total accurate regardless of skipped closings; only the
+  // *photo/physical-count* step gets skipped on an unclosed day, not the
+  // transactions themselves.
+  const carryForwardTo = (targetDate) => {
+    if (!lastClosedClosing) return { cash: 0, gcash: 0 };
+    let cash = lastClosedClosing.countedCash || 0;
+    let gcash = lastClosedClosing.countedGCash || 0;
+    for (const t of transactions) {
+      const d = localDateKey(t.datetime);
+      if (d > lastClosedClosing.date && d < targetDate) {
+        const amt = Number(t.amount) || 0;
+        const signed = t.type === 'Cash In' ? amt : -amt;
+        if (t.destination === 'Cash') cash += signed;
+        else gcash += signed;
+      }
+    }
+    return { cash, gcash };
+  };
+
+  const openingCash = todaysClosing ? todaysClosing.openingCash : (lastClosedClosing ? carryForwardTo(today).cash : 0);
+  const openingGCash = todaysClosing ? todaysClosing.openingGCash : (lastClosedClosing ? carryForwardTo(today).gcash : 0);
   const expectedCash = openingCash + sums.cashIn - sums.cashOut;
   const expectedGCash = openingGCash + sums.gcashIn - sums.gcashOut;
 
   const needsManualOpening = !todaysClosing && !lastClosedClosing;
+
+  // Any past date with recorded activity (a transaction or a clock-in) that
+  // never got a real Closed record - these need Admin/Owner follow-up.
+  const missedDays = useMemo(() => {
+    const activityDates = new Set();
+    for (const t of transactions) activityDates.add(localDateKey(t.datetime));
+    for (const a of attendance) activityDates.add(a.date);
+    const closedDates = new Set(closings.filter(c => c.status === 'Closed').map(c => c.date));
+    return [...activityDates].filter(d => d < today && !closedDates.has(d)).sort();
+  }, [transactions, attendance, closings, today]);
+
+  const [resolvingDate, setResolvingDate] = useState(null);
+
+  const expectedForDate = (dateStr) => {
+    const carried = carryForwardTo(dateStr);
+    let cashIn = 0, cashOut = 0, gcashIn = 0, gcashOut = 0;
+    for (const t of transactions) {
+      if (localDateKey(t.datetime) !== dateStr) continue;
+      const amt = Number(t.amount) || 0;
+      if (t.destination === 'Cash') { t.type === 'Cash In' ? cashIn += amt : cashOut += amt; }
+      else { t.type === 'Cash In' ? gcashIn += amt : gcashOut += amt; }
+    }
+    return {
+      openingCash: carried.cash, openingGCash: carried.gcash,
+      expectedCash: carried.cash + cashIn - cashOut,
+      expectedGCash: carried.gcash + gcashIn - gcashOut,
+    };
+  };
+
+  const [resolveError, setResolveError] = useState('');
+
+  const resolveMissedDay = async (dateStr, useExpected, manualCash, manualGCash, note) => {
+    setResolveError('');
+    try {
+      const { openingCash: oc, openingGCash: og, expectedCash: ec, expectedGCash: eg } = expectedForDate(dateStr);
+      const countedCash = useExpected ? ec : Number(manualCash) || 0;
+      const countedGCash = useExpected ? eg : Number(manualGCash) || 0;
+      const finalRec = {
+        date: dateStr, openingCash: oc, openingGCash: og, expectedCash: ec, expectedGCash: eg,
+        countedCash, cashDifference: countedCash - ec,
+        countedGCash, gcashDifference: countedGCash - eg,
+        denominations: null,
+        notes: note || 'No physical count was performed — closed using system-calculated totals.',
+        status: 'Closed', closedBy: currentEmployee.name, closedAt: new Date().toISOString(),
+      };
+      const saved = await upsertClosing(finalRec);
+      markOwnAction(saved.id);
+      setClosings(prev => [...prev.filter(c => c.date !== dateStr), saved]);
+      setResolvingDate(null);
+    } catch (err) {
+      console.error('Resolving missed day failed', err);
+      setResolveError('Something went wrong saving this. Please try again.');
+    }
+  };
 
   const resetLogin = () => { setLoginPicked(null); setPin(''); setLoginError(''); };
 
@@ -600,6 +686,19 @@ export default function App() {
       </div>
     );
   }
+  
+  if (showOpeningEntry) {
+    return (
+      <div className="pos-root">
+        <style>{STYLES}</style>
+        <OpeningEntryPage
+          employeeName={currentEmployee.name}
+          onCancel={doClockOut}
+          onSave={saveOpeningBalances}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="pos-root">
@@ -639,6 +738,17 @@ export default function App() {
 
       {activeView === 'home' && (
         <>
+          {missedDays.length > 0 && canManage && (
+            <button className="missed-day-banner" onClick={() => setResolvingDate(missedDays[0])}>
+              <AlertTriangle size={16} />
+              <span>
+                {missedDays.length === 1
+                  ? `${missedDays[0]} was never closed — tap to resolve`
+                  : `${missedDays.length} days were never closed — tap to resolve`}
+              </span>
+            </button>
+          )}
+
           <div className="status-row">
             <div className="status-pill">
               <span className={`dot ${isClockedIn ? 'dot-on' : 'dot-off'}`} />
@@ -821,6 +931,15 @@ export default function App() {
       )}
       {closedReceipt && (
         <ClosedReceiptModal record={closedReceipt} onClose={() => setClosedReceipt(null)} />
+      )}
+      {resolvingDate && (
+        <ResolveMissedDayModal
+          date={resolvingDate}
+          expected={expectedForDate(resolvingDate)}
+          externalError={resolveError}
+          onClose={() => { setResolvingDate(null); setResolveError(''); }}
+          onResolve={resolveMissedDay}
+        />
       )}
     </div>
   );
@@ -1508,6 +1627,83 @@ function CashCountModal({ expectedCash, expectedGCash, externalError, onClose, o
   );
 }
 
+function ResolveMissedDayModal({ date, expected, externalError, onClose, onResolve }) {
+  const [mode, setMode] = useState('accept'); // 'accept' | 'manual'
+  const [manualCash, setManualCash] = useState(String(expected.expectedCash.toFixed(2)));
+  const [manualGCash, setManualGCash] = useState(String(expected.expectedGCash.toFixed(2)));
+  const [note, setNote] = useState('');
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (externalError) {
+      setError(externalError);
+      setSubmitting(false);
+    }
+  }, [externalError]);
+
+  const handleResolve = async () => {
+    setError('');
+    if (mode === 'manual' && !note.trim()) {
+      setError('Add a note explaining where this number came from.');
+      return;
+    }
+    setSubmitting(true);
+    await onResolve(
+      date,
+      mode === 'accept',
+      manualCash,
+      manualGCash,
+      mode === 'accept' ? '' : note.trim()
+    );
+  };
+
+  return (
+    <Modal title="Resolve missed closing" onClose={onClose}>
+      <p className="modal-sub">
+        <strong>{date}</strong> was never closed. A physical count can't be done retroactively,
+        so choose how to record it — this will be clearly marked as resolved after the fact.
+      </p>
+
+      <div className="close-summary">
+        <div className="close-row"><span>Opening cash</span><span className="mono-val">{peso(expected.openingCash)}</span></div>
+        <div className="close-row close-row-total"><span>Expected cash (system total)</span><span className="mono-val">{peso(expected.expectedCash)}</span></div>
+      </div>
+      <div className="close-summary" style={{ marginTop: 10 }}>
+        <div className="close-row"><span>Opening GCash</span><span className="mono-val">{peso(expected.openingGCash)}</span></div>
+        <div className="close-row close-row-total"><span>Expected GCash (system total)</span><span className="mono-val">{peso(expected.expectedGCash)}</span></div>
+      </div>
+
+      <div className="toggle-row" style={{ marginTop: 14 }}>
+        <button className={`toggle-btn ${mode === 'accept' ? 'toggle-on-blue' : ''}`} onClick={() => setMode('accept')}>Accept system total</button>
+        <button className={`toggle-btn ${mode === 'manual' ? 'toggle-on-blue' : ''}`} onClick={() => setMode('manual')}>Enter a different number</button>
+      </div>
+
+      {mode === 'accept' ? (
+        <p className="modal-sub">
+          This records the day as closed with no discrepancy, and automatically notes that
+          no physical count was performed.
+        </p>
+      ) : (
+        <>
+          <label className="field-label">Counted cash (from another record, e.g. a notebook)</label>
+          <input className="field-input mono-input" type="number" step="0.01" value={manualCash} onChange={e => setManualCash(e.target.value)} />
+          <label className="field-label">Counted GCash</label>
+          <input className="field-input mono-input" type="number" step="0.01" value={manualGCash} onChange={e => setManualGCash(e.target.value)} />
+          <label className="field-label">Note — where did this number come from?</label>
+          <textarea className="field-input" rows={2} value={note} onChange={e => setNote(e.target.value)} placeholder="e.g. taken from the paper notebook backup" />
+        </>
+      )}
+
+      {error && <div className="error-line"><AlertCircle size={14} /> {error}</div>}
+
+      <button className="btn btn-highlight btn-block" style={{ marginTop: 14 }} onClick={handleResolve} disabled={submitting}>
+        <Check size={16} /> {submitting ? 'Saving…' : 'Resolve this day'}
+      </button>
+    </Modal>
+  );
+}
+
 function ClosedReceiptModal({ record, onClose }) {
   const diff = record.cashDifference;
   return (
@@ -1543,7 +1739,7 @@ function ClosedReceiptModal({ record, onClose }) {
 }
 
 const STYLES = `
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Lexend:wght@500;700&family=Inter:wght@400;500;600&family=Epilogue:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap');
 
 html, body {
   margin: 0;
@@ -1596,9 +1792,9 @@ html, body {
 }
 .login-logo-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; margin-bottom: 22px; }
 .login-logo { width: 128px; height: 128px; object-fit: cover; border-radius: 20px; box-shadow: 0 0 0 1px var(--paper-dark); }
-.brand-title { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 18px; letter-spacing: -0.2px; line-height: 1.15; }
+.brand-title { font-family: 'Lexend', sans-serif; font-weight: 700; font-size: 18px; letter-spacing: -0.2px; line-height: 1.15; }
 .brand-sub { font-size: 12px; color: var(--ink-soft); }
-.brand-title-sm { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 13px; line-height: 1.15; }
+.brand-title-sm { font-family: 'Lexend', sans-serif; font-weight: 700; font-size: 13px; line-height: 1.15; }
 .brand-sub-sm { font-size: 11px; color: var(--ink-soft); font-family: 'IBM Plex Mono', monospace; }
 
 .login-wrap { padding: 8px 4px 20px; }
@@ -1618,7 +1814,7 @@ html, body {
 
 .avatar-circle {
   width: 46px; height: 46px; border-radius: 50%; background: var(--rule-blue); color: var(--ink);
-  display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 15px; font-family: 'Space Grotesk', sans-serif;
+  display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 15px; font-family: 'Lexend', sans-serif;
   flex-shrink: 0;
 }
 .avatar-sm { width: 34px; height: 34px; font-size: 12px; }
@@ -1640,7 +1836,7 @@ html, body {
 }
 .lcd-total { max-width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; }
 .lcd-total-label { font-size: 11px; color: #6FE3A3; opacity: 0.85; letter-spacing: 1px; }
-.lcd-total-value { font-size: 22px; }
+.lcd-total-value { font-size: 22px; font-family: 'Epilogue', sans-serif; font-weight: 500; }
 
 .pin-dot { width: 12px; height: 12px; border-radius: 50%; border: 2px solid #6FE3A3; }
 .pin-dot-filled { background: #6FE3A3; }
@@ -1691,6 +1887,12 @@ html, body {
 .action-row { display: flex; gap: 8px; margin-bottom: 6px; }
 .action-row .btn-block { flex: 1; }
 .hint-line { font-size: 11px; color: var(--ink-soft); margin-bottom: 10px; }
+.missed-day-banner {
+  width: 100%; display: flex; align-items: center; gap: 8px; background: var(--highlight); color: #fff;
+  border: none; border-radius: 10px; padding: 10px 14px; font-size: 12.5px; font-weight: 600;
+  margin-bottom: 12px; cursor: pointer; font-family: inherit; text-align: left;
+}
+
 .closed-badge { display: flex; align-items: center; justify-content: center; gap: 6px; background: var(--success-bg); color: var(--success); border-radius: 10px; padding: 10px 14px; font-size: 13px; font-weight: 600; }
 .closed-badge-btn { border: 1px solid var(--success); cursor: pointer; font-family: inherit; }
 
@@ -1701,7 +1903,7 @@ html, body {
 .opening-page-intro { font-size: 13px; color: var(--ink-soft); line-height: 1.5; margin-bottom: 18px; }
 .summary-card { background: #fff; border: 1px solid var(--paper-dark); border-radius: 12px; padding: 12px 14px; }
 .summary-label { font-size: 11px; color: var(--ink-soft); display: flex; align-items: center; gap: 5px; margin-bottom: 4px; }
-.summary-value { font-family: 'IBM Plex Mono', monospace; font-size: 18px; font-weight: 600; }
+.summary-value { font-family: 'Epilogue', sans-serif; font-size: 18px; font-weight: 500; }
 .summary-foot { font-size: 10px; color: var(--ink-soft); margin-top: 3px; }
 
 .receipt-panel { background: var(--paper-dark); border-radius: 4px; margin-top: 16px; padding: 4px 14px 10px; position: relative; }
@@ -1729,13 +1931,13 @@ html, body {
 }
 @keyframes toast-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
 
-.receipt-header { display: flex; align-items: center; gap: 6px; font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 13px; padding: 10px 0 8px; }
+.receipt-header { display: flex; align-items: center; gap: 6px; font-family: 'Lexend', sans-serif; font-weight: 700; font-size: 13px; padding: 10px 0 8px; }
 .receipt-count { margin-left: auto; font-family: 'IBM Plex Mono', monospace; font-weight: 500; color: var(--ink-soft); font-size: 12px; }
 .receipt-list { display: flex; flex-direction: column; }
 .receipt-row { padding: 9px 0; border-top: 1px dashed #C9C0AA; }
 .receipt-row:first-child { border-top: none; }
 .receipt-row-top { display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; }
-.receipt-amt { font-family: 'IBM Plex Mono', monospace; }
+.receipt-amt { font-family: 'Epilogue', sans-serif; font-weight: 500; }
 .amt-in { color: var(--success); }
 .amt-out { color: var(--danger); }
 .receipt-row-bottom { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--ink-soft); margin-top: 2px; }
@@ -1745,7 +1947,7 @@ html, body {
 .modal-card { background: var(--paper); width: 100%; max-width: 480px; max-height: 88vh; overflow-y: auto; border-radius: 18px 18px 0 0; padding: 18px; }
 .modal-wide { max-width: 480px; }
 .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
-.modal-title { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 16px; }
+.modal-title { font-family: 'Lexend', sans-serif; font-weight: 700; font-size: 16px; }
 .modal-sub { font-size: 12px; color: var(--ink-soft); margin: 4px 0 12px; }
 .modal-body { padding-bottom: 4px; }
 
@@ -1757,7 +1959,7 @@ html, body {
 
 .field-label { display: block; font-size: 11px; font-weight: 600; color: var(--ink-soft); margin: 10px 0 4px; }
 .field-input { width: 100%; border: 1px solid var(--paper-dark); background: #fff; border-radius: 9px; padding: 9px 11px; font-size: 13px; font-family: inherit; color: var(--ink); }
-.mono-input { font-family: 'IBM Plex Mono', monospace; }
+.mono-input { font-family: 'Epilogue', sans-serif; }
 
 .emp-list { display: flex; flex-direction: column; gap: 8px; }
 .emp-row { display: flex; align-items: center; gap: 10px; background: #fff; border: 1px solid var(--paper-dark); border-radius: 10px; padding: 8px 10px; }
@@ -1782,13 +1984,13 @@ html, body {
 .close-summary { background: #fff; border: 1px solid var(--paper-dark); border-radius: 10px; padding: 10px 14px; }
 .close-row { display: flex; justify-content: space-between; font-size: 12.5px; padding: 5px 0; }
 .close-row-total { border-top: 1px dashed #C9C0AA; margin-top: 4px; padding-top: 8px; font-weight: 700; }
-.mono-val { font-family: 'IBM Plex Mono', monospace; }
+.mono-val { font-family: 'Epilogue', sans-serif; }
 
 .denom-grid { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
 .denom-row { display: grid; grid-template-columns: 44px 1fr 80px; align-items: center; gap: 8px; }
-.denom-label { font-family: 'IBM Plex Mono', monospace; font-weight: 600; font-size: 13px; }
+.denom-label { font-family: 'Epilogue', sans-serif; font-weight: 500; font-size: 13px; }
 .denom-input { text-align: center; }
-.denom-subtotal { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--ink-soft); text-align: right; }
+.denom-subtotal { font-family: 'Epilogue', sans-serif; font-size: 11px; color: var(--ink-soft); text-align: right; }
 
 .diff-line { text-align: center; font-size: 12px; font-weight: 600; padding: 6px; border-radius: 8px; margin-top: 6px; }
 .diff-even { background: var(--success-bg); color: var(--success); }
@@ -1819,7 +2021,7 @@ html, body {
 
 .view-panel { padding-bottom: 4px; }
 .view-panel-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
-.view-panel-title { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 18px; }
+.view-panel-title { font-family: 'Lexend', sans-serif; font-weight: 700; font-size: 18px; }
 .clear-filter-link { background: none; border: none; color: var(--rule-blue); font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; }
 
 .view-more-link {
