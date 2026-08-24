@@ -153,8 +153,6 @@ function playPingSound() {
     }
   } catch (e) { console.error('ping sound failed', e); }
 }
-}
-
 
 function PinDots({ value, length = 4 }) {
   return (
