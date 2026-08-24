@@ -154,6 +154,7 @@ function playPingSound() {
   } catch (e) { console.error('ping sound failed', e); }
 }
 
+
 function PinDots({ value, length = 4 }) {
   return (
     <div className="pin-dots-row">
@@ -327,6 +328,11 @@ export default function App() {
     return () => clearInterval(t);
   }, []);
 
+useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
   // Live sync: pick up changes made from other devices/tabs.
   // Both the realtime subscription AND the periodic poll below call the same
   // syncAttendance/syncTransactions/syncClosings functions, which detect new
@@ -443,7 +449,19 @@ export default function App() {
   const [resolvingDate, setResolvingDate] = useState(null);
 
   const expectedForDate = (dateStr) => {
-    const carried = carryForwardTo(dateStr);
+    const existingClosing = closings.find(c => c.date === dateStr);
+    let baseCash, baseGCash;
+    if (existingClosing) {
+      // A record already exists for this date (e.g. a manually-entered
+      // first-shift opening balance saved as a Draft) - use its own opening
+      // figures rather than recomputing from a prior closed day.
+      baseCash = existingClosing.openingCash;
+      baseGCash = existingClosing.openingGCash;
+    } else {
+      const carried = carryForwardTo(dateStr);
+      baseCash = carried.cash;
+      baseGCash = carried.gcash;
+    }
     let cashIn = 0, cashOut = 0, gcashIn = 0, gcashOut = 0;
     for (const t of transactions) {
       if (localDateKey(t.datetime) !== dateStr) continue;
@@ -452,9 +470,9 @@ export default function App() {
       else { t.type === 'Cash In' ? gcashIn += amt : gcashOut += amt; }
     }
     return {
-      openingCash: carried.cash, openingGCash: carried.gcash,
-      expectedCash: carried.cash + cashIn - cashOut,
-      expectedGCash: carried.gcash + gcashIn - gcashOut,
+      openingCash: baseCash, openingGCash: baseGCash,
+      expectedCash: baseCash + cashIn - cashOut,
+      expectedGCash: baseGCash + gcashIn - gcashOut,
     };
   };
 
@@ -1548,7 +1566,7 @@ function CashCountModal({ expectedCash, expectedGCash, externalError, onClose, o
     onConfirm(counts, gcash, notes.trim(), photoFile);
   };
 
-return (
+  return (
     <Modal title="Cash count" onClose={onClose}>
       <p className="modal-sub">Count each denomination in the drawer.</p>
       <div className="denom-grid">
