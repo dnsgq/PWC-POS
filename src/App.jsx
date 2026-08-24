@@ -153,15 +153,6 @@ function playPingSound() {
     }
   } catch (e) { console.error('ping sound failed', e); }
 }
-function playPingSound() {
-  try {
-    const el = getAudioEl();
-    el.currentTime = 0;
-    const playAttempt = el.play();
-    if (playAttempt && typeof playAttempt.catch === 'function') {
-      playAttempt.catch((e) => console.error('ping sound failed', e));
-    }
-  } catch (e) { console.error('ping sound failed', e); }
 }
 
 
@@ -352,7 +343,7 @@ export default function App() {
       syncTransactions().catch(console.error);
       syncClosings().catch(console.error);
     };
-    
+
     const channel = supabase.channel('pos-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'employees' }, () => {
         fetchEmployees().then(setEmployees).catch(console.error);
@@ -674,19 +665,6 @@ export default function App() {
     );
   }
 
-  if (showOpeningEntry) {
-    return (
-      <div className="pos-root">
-        <style>{STYLES}</style>
-        <OpeningEntryPage
-          employeeName={currentEmployee.name}
-          onCancel={doClockOut}
-          onSave={saveOpeningBalances}
-        />
-      </div>
-    );
-  }
-  
   if (showOpeningEntry) {
     return (
       <div className="pos-root">
@@ -1572,7 +1550,7 @@ function CashCountModal({ expectedCash, expectedGCash, externalError, onClose, o
     onConfirm(counts, gcash, notes.trim(), photoFile);
   };
 
-  return (
+return (
     <Modal title="Cash count" onClose={onClose}>
       <p className="modal-sub">Count each denomination in the drawer.</p>
       <div className="denom-grid">
