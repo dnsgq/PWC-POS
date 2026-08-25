@@ -328,11 +328,6 @@ export default function App() {
     return () => clearInterval(t);
   }, []);
 
-useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(t);
-  }, []);
-
   // Live sync: pick up changes made from other devices/tabs.
   // Both the realtime subscription AND the periodic poll below call the same
   // syncAttendance/syncTransactions/syncClosings functions, which detect new
@@ -429,7 +424,7 @@ useEffect(() => {
     return { cash, gcash };
   };
 
-  const openingCash = todaysClosing ? todaysClosing.openingCash : (lastClosedClosing ? carryForwardTo(today).cash : 0);
+const openingCash = todaysClosing ? todaysClosing.openingCash : (lastClosedClosing ? carryForwardTo(today).cash : 0);
   const openingGCash = todaysClosing ? todaysClosing.openingGCash : (lastClosedClosing ? carryForwardTo(today).gcash : 0);
   const expectedCash = openingCash + sums.cashIn - sums.cashOut;
   const expectedGCash = openingGCash + sums.gcashIn - sums.gcashOut;
@@ -638,7 +633,7 @@ useEffect(() => {
     );
   }
 
-  if (!currentEmployee) {
+if (!currentEmployee) {
     return (
       <div className="pos-root">
         <style>{STYLES}</style>
@@ -768,11 +763,11 @@ useEffect(() => {
 
           <div className="summary-grid">
             <div className="summary-card summary-card-muted">
-              <div className="summary-label">Today's opening cash</div>
+              <div className="summary-label">Today's Opening Cash</div>
               <div className="summary-value">{peso(openingCash)}</div>
             </div>
             <div className="summary-card summary-card-muted">
-              <div className="summary-label">Today's opening GCash</div>
+              <div className="summary-label">Today's Opening GCash</div>
               <div className="summary-value">{peso(openingGCash)}</div>
             </div>
           </div>
@@ -792,7 +787,12 @@ useEffect(() => {
 
           {activeCashiers.length > 0 && (
             <div className="action-row">
-              <button className="btn btn-highlight btn-block" onClick={() => setShowTxn(true)} disabled={todaysClosing?.status === 'Closed'} title={todaysClosing?.status === 'Closed' ? 'Day is closed' : ''}>
+              <button
+                className="btn btn-highlight btn-block"
+                onClick={() => setShowTxn(true)}
+                disabled={todaysClosing?.status === 'Closed' || !isClockedIn}
+                title={todaysClosing?.status === 'Closed' ? 'Day is closed' : (!isClockedIn ? 'Clock in first to record a transaction' : '')}
+              >
                 <Plus size={18} /> New transaction
               </button>
               {todaysClosing?.status === 'Closed' ? (
@@ -813,7 +813,7 @@ useEffect(() => {
             </div>
           )}
           {activeCashiers.length === 0 && <div className="hint-line">Clock in to start recording transactions and closing the day.</div>}
-          {activeCashiers.length > 0 && !isClockedIn && <div className="hint-line">Clock in to close the day yourself, or ask an active cashier to.</div>}
+          {activeCashiers.length > 0 && !isClockedIn && <div className="hint-line">Clock in to record transactions or close the day yourself.</div>}
 
           <div className="receipt-panel">
             <div className="receipt-tear" />
@@ -1182,7 +1182,7 @@ function AnalyticsView({ employees, attendance, transactions, closings }) {
     downloadCSV(`transactions-${todayStr()}.csv`, csv);
   };
 
-  const exportAttendance = () => {
+const exportAttendance = () => {
     const csv = toCSV(attendance, [
       { label: 'Employee', value: a => a.employeeName },
       { label: 'Role', value: a => a.role },
