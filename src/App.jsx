@@ -297,7 +297,7 @@ export default function App() {
     setClosings(rows);
   };
 
-useEffect(() => {
+  useEffect(() => {
     currentEmployeeRef.current = currentEmployee;
   }, [currentEmployee]);
 
@@ -496,7 +496,7 @@ useEffect(() => {
     }
   };
 
-  const resetLogin = () => { setLoginPicked(null); setPin(''); setLoginError(''); };
+const resetLogin = () => { setLoginPicked(null); setPin(''); setLoginError(''); };
 
   const tryPin = async (nextPin) => {
     setPin(nextPin);
@@ -1322,7 +1322,7 @@ function AnalyticsView({ employees, attendance, transactions, closings }) {
     return `${hh}h ${mm}m`;
   };
 
-const exportTransactions = () => {
+  const exportTransactions = () => {
     const csv = toCSV(transactions, [
       { label: 'ID', value: t => t.id },
       { label: 'Date/Time', value: t => dateTimeStr(t.datetime) },
@@ -2064,10 +2064,10 @@ html, body {
 
 .search-filter-row { display: flex; gap: 8px; margin: 10px 0 4px; }
 .search-input-wrap { flex: 1; position: relative; }
-.search-input-icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--ink-soft); }
-.search-input { padding-left: 32px; }
-.filter-btn { white-space: nowrap; padding: 9px 14px; }
-.filter-btn-active { border-color: var(--rule-blue); color: var(--rule-blue); background: #E3F4F5; }
+.search-input-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--ink-soft); pointer-events: none; }
+.search-input { width: 100%; padding-left: 36px !important; box-sizing: border-box; }
+.filter-btn { white-space: nowrap; padding: 9px 14px; position: relative; background: var(--highlight); color: #fff; border: none; }
+.filter-btn-active::after { content: ''; position: absolute; top: 6px; right: 6px; width: 7px; height: 7px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 2px var(--highlight); }
 .filter-modal-actions { display: flex; gap: 8px; margin-top: 16px; }
 
 .day-summary-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
@@ -2207,4 +2207,3 @@ html, body {
 .report-row-date { font-family: 'IBM Plex Mono', monospace; font-weight: 500; color: var(--ink-soft); font-size: 11px; }
 .report-row-bottom { display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-soft); margin-top: 3px; }
 `;
-
