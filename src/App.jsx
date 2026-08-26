@@ -3,7 +3,7 @@ import {
   Clock, LogOut, Plus, Lock, Settings, X, Check, Banknote,
   Smartphone, ChevronLeft, UserPlus, AlertCircle, Delete, ShieldCheck,
   Users, Receipt, Trash2, CalendarClock, ChevronRight, Home, ListOrdered, FileBarChart2,
-  UserMinus, PieChart, Download, TimerReset, AlertTriangle
+  UserMinus, PieChart, Download, TimerReset, AlertTriangle, SlidersHorizontal, Search
 } from 'lucide-react';
 import { fetchEmployees, insertEmployee, updateEmployeeActive, fetchAttendance, insertAttendance, clockOutAttendance, fetchTransactions, insertTransaction, fetchClosings, upsertClosing, fetchPushSubscriptionForEndpoint, savePushSubscription, deletePushSubscription, uploadClosingPhoto } from './api';
 import { supabase } from './supabaseClient';
@@ -207,7 +207,6 @@ export default function App() {
   const [now, setNow] = useState(new Date());
   const [currentEmployee, setCurrentEmployee] = useState(null);
   const [activeView, setActiveView] = useState('home');
-  const [txnDateFilter, setTxnDateFilter] = useState(null);
   const [toasts, setToasts] = useState([]);
   const pendingIdsRef = useRef(new Set());
   const knownAttendanceIdsRef = useRef(null);
@@ -298,7 +297,7 @@ export default function App() {
     setClosings(rows);
   };
 
-  useEffect(() => {
+useEffect(() => {
     currentEmployeeRef.current = currentEmployee;
   }, [currentEmployee]);
 
@@ -424,7 +423,7 @@ export default function App() {
     return { cash, gcash };
   };
 
-const openingCash = todaysClosing ? todaysClosing.openingCash : (lastClosedClosing ? carryForwardTo(today).cash : 0);
+  const openingCash = todaysClosing ? todaysClosing.openingCash : (lastClosedClosing ? carryForwardTo(today).cash : 0);
   const openingGCash = todaysClosing ? todaysClosing.openingGCash : (lastClosedClosing ? carryForwardTo(today).gcash : 0);
   const expectedCash = openingCash + sums.cashIn - sums.cashOut;
   const expectedGCash = openingGCash + sums.gcashIn - sums.gcashOut;
@@ -633,7 +632,7 @@ const openingCash = todaysClosing ? todaysClosing.openingCash : (lastClosedClosi
     );
   }
 
-if (!currentEmployee) {
+  if (!currentEmployee) {
     return (
       <div className="pos-root">
         <style>{STYLES}</style>
@@ -841,7 +840,7 @@ if (!currentEmployee) {
               </div>
             )}
             {todaysTxns.length > 5 && (
-              <button className="view-more-link" onClick={() => { setTxnDateFilter(today); setActiveView('transactions'); }}>
+              <button className="view-more-link" onClick={() => setActiveView('transactions')}>
                 View more <ChevronRight size={14} />
               </button>
             )}
@@ -851,11 +850,7 @@ if (!currentEmployee) {
       )}
 
       {activeView === 'transactions' && (
-        <TransactionsView
-          transactions={transactions}
-          dateFilter={txnDateFilter}
-          onClearFilter={() => setTxnDateFilter(null)}
-        />
+        <TransactionsView transactions={transactions} />
       )}
 
       {activeView === 'reports' && canSeeReports && (
@@ -872,7 +867,7 @@ if (!currentEmployee) {
         <button className={`nav-btn ${activeView === 'home' ? 'nav-btn-active' : ''}`} onClick={() => setActiveView('home')}>
           <Home size={19} /><span>Home</span>
         </button>
-        <button className={`nav-btn ${activeView === 'transactions' ? 'nav-btn-active' : ''}`} onClick={() => { setTxnDateFilter(null); setActiveView('transactions'); }}>
+        <button className={`nav-btn ${activeView === 'transactions' ? 'nav-btn-active' : ''}`} onClick={() => setActiveView('transactions')}>
           <ListOrdered size={19} /><span>Transactions</span>
         </button>
         {canSeeReports && (
@@ -954,45 +949,40 @@ function dateHeading(dateStr) {
   return d.toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 }
 
-function TransactionsView({ transactions, dateFilter, onClearFilter }) {
-  const sorted = useMemo(() => [...transactions].sort((a, b) => b.datetime.localeCompare(a.datetime)), [transactions]);
-  const filtered = dateFilter ? sorted.filter(t => localDateKey(t.datetime) === dateFilter) : sorted;
-  const groups = useMemo(() => groupByDate(filtered, t => localDateKey(t.datetime)), [filtered]);
+function TransactionsView({ transactions }) {
+  const today = todayStr();
+  const todays = useMemo(
+    () => transactions.filter(t => localDateKey(t.datetime) === today).sort((a, b) => b.datetime.localeCompare(a.datetime)),
+    [transactions, today]
+  );
 
   return (
     <div className="view-panel">
       <div className="view-panel-header">
         <div className="view-panel-title">Transactions</div>
-        {dateFilter && (
-          <button className="clear-filter-link" onClick={onClearFilter}>Show all dates</button>
-        )}
       </div>
-      {groups.length === 0 ? (
-        <div className="empty-state">No transactions recorded yet.</div>
+      <div className="date-group-heading">{dateHeading(today)}</div>
+      {todays.length === 0 ? (
+        <div className="empty-state">No transactions yet today.</div>
       ) : (
-        groups.map(([date, txns]) => (
-          <div key={date} className="date-group">
-            <div className="date-group-heading">{dateHeading(date)}</div>
-            <div className="receipt-panel receipt-panel-flat">
-              <div className="receipt-list">
-                {txns.map(t => (
-                  <div key={t.id} className="receipt-row">
-                    <div className="receipt-row-top">
-                      <span className="receipt-cat">{t.category}</span>
-                      <span className={`receipt-amt ${t.type === 'Cash In' ? 'amt-in' : 'amt-out'}`}>
-                        {t.type === 'Cash In' ? '+' : '−'}{peso(t.amount)}
-                      </span>
-                    </div>
-                    <div className="receipt-row-bottom">
-                      <span>{t.description || '—'}</span>
-                      <span>{t.destination} · {timeStr(t.datetime)} · {t.createdByName}</span>
-                    </div>
-                  </div>
-                ))}
+        <div className="receipt-panel receipt-panel-flat">
+          <div className="receipt-list">
+            {todays.map(t => (
+              <div key={t.id} className="receipt-row">
+                <div className="receipt-row-top">
+                  <span className="receipt-cat">{t.category}</span>
+                  <span className={`receipt-amt ${t.type === 'Cash In' ? 'amt-in' : 'amt-out'}`}>
+                    {t.type === 'Cash In' ? '+' : '−'}{peso(t.amount)}
+                  </span>
+                </div>
+                <div className="receipt-row-bottom">
+                  <span>{t.description || '—'}</span>
+                  <span>{t.destination} · {timeStr(t.datetime)} · {t.createdByName}</span>
+                </div>
               </div>
-            </div>
+            ))}
           </div>
-        ))
+        </div>
       )}
     </div>
   );
@@ -1009,6 +999,65 @@ function ReportsView({ transactions, attendance, closings }) {
       Math.abs(c.gcashDifference || 0) >= DISCREPANCY_THRESHOLD
     )
   ), [cls]);
+
+  const [searchText, setSearchText] = useState('');
+  const [showFilter, setShowFilter] = useState(false);
+  const [filterCategory, setFilterCategory] = useState('All');
+  const [filterType, setFilterType] = useState('All');
+  const [filterDestination, setFilterDestination] = useState('All');
+  const [expandedDates, setExpandedDates] = useState(() => new Set());
+
+  const hasActiveFilter = filterCategory !== 'All' || filterType !== 'All' || filterDestination !== 'All';
+  const searchActive = searchText.trim().length > 0;
+
+  const filteredTxns = useMemo(() => {
+    let list = txns;
+    if (filterCategory !== 'All') list = list.filter(t => t.category === filterCategory);
+    if (filterType !== 'All') list = list.filter(t => t.type === filterType);
+    if (filterDestination !== 'All') list = list.filter(t => t.destination === filterDestination);
+    if (searchActive) {
+      const q = searchText.trim().toLowerCase();
+      list = list.filter(t =>
+        (t.description || '').toLowerCase().includes(q) ||
+        (t.category || '').toLowerCase().includes(q) ||
+        (t.createdByName || '').toLowerCase().includes(q) ||
+        (t.id || '').toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [txns, filterCategory, filterType, filterDestination, searchText]);
+
+  const daySummaries = useMemo(() => {
+    const groups = groupByDate(filteredTxns, t => localDateKey(t.datetime));
+    return groups.map(([date, dayTxns]) => {
+      let totalIn = 0, totalOut = 0;
+      const employeeSet = new Set();
+      for (const t of dayTxns) {
+        const amt = Number(t.amount) || 0;
+        if (t.type === 'Cash In') totalIn += amt; else totalOut += amt;
+        employeeSet.add(t.createdByName);
+      }
+      const sortedTimes = [...dayTxns].sort((a, b) => a.datetime.localeCompare(b.datetime));
+      return {
+        date, txns: dayTxns, totalIn, totalOut,
+        employees: [...employeeSet],
+        startTime: timeStr(sortedTimes[0].datetime),
+        endTime: timeStr(sortedTimes[sortedTimes.length - 1].datetime),
+      };
+    });
+  }, [filteredTxns]);
+
+  const showExpanded = searchActive || hasActiveFilter;
+
+  const toggleExpand = (date) => {
+    setExpandedDates(prev => {
+      const next = new Set(prev);
+      next.has(date) ? next.delete(date) : next.add(date);
+      return next;
+    });
+  };
+
+  const resetFilters = () => { setFilterCategory('All'); setFilterType('All'); setFilterDestination('All'); };
 
   return (
     <div className="view-panel">
@@ -1045,30 +1094,99 @@ function ReportsView({ transactions, attendance, closings }) {
       <div className="receipt-panel" style={{ marginTop: 14 }}>
         <div className="receipt-tear" />
         <div className="receipt-header">
-          <Receipt size={14} /> All transactions <span className="receipt-count">{txns.length}</span>
+          <Receipt size={14} /> All transactions <span className="receipt-count">{filteredTxns.length}</span>
         </div>
-        {txns.length === 0 ? (
-          <div className="empty-state">No transactions recorded yet.</div>
-        ) : (
-          <div className="receipt-list">
-            {txns.map(t => (
-              <div key={t.id} className="receipt-row">
-                <div className="receipt-row-top">
-                  <span className="receipt-cat">{t.category}</span>
-                  <span className={`receipt-amt ${t.type === 'Cash In' ? 'amt-in' : 'amt-out'}`}>
-                    {t.type === 'Cash In' ? '+' : '−'}{peso(t.amount)}
-                  </span>
-                </div>
-                <div className="receipt-row-bottom">
-                  <span>{t.description || '—'} · {t.id}</span>
-                  <span>{t.destination} · {dateTimeStr(t.datetime)} · {t.createdByName}</span>
-                </div>
+
+        <div className="search-filter-row">
+          <div className="search-input-wrap">
+            <Search size={14} className="search-input-icon" />
+            <input
+              className="field-input search-input"
+              placeholder="Search description, category, employee…"
+              value={searchText}
+              onChange={e => setSearchText(e.target.value)}
+            />
+          </div>
+          <button className={`btn btn-outline filter-btn ${hasActiveFilter ? 'filter-btn-active' : ''}`} onClick={() => setShowFilter(true)}>
+            <SlidersHorizontal size={14} /> Filter
+          </button>
+        </div>
+
+        {daySummaries.length === 0 ? (
+          <div className="empty-state">No transactions found.</div>
+        ) : showExpanded ? (
+          daySummaries.map(day => (
+            <div key={day.date} className="date-group">
+              <div className="date-group-heading">{dateHeading(day.date)}</div>
+              <div className="receipt-list">
+                {day.txns.map(t => (
+                  <div key={t.id} className="receipt-row">
+                    <div className="receipt-row-top">
+                      <span className="receipt-cat">{t.category}</span>
+                      <span className={`receipt-amt ${t.type === 'Cash In' ? 'amt-in' : 'amt-out'}`}>
+                        {t.type === 'Cash In' ? '+' : '−'}{peso(t.amount)}
+                      </span>
+                    </div>
+                    <div className="receipt-row-bottom">
+                      <span>{t.description || '—'} · {t.id}</span>
+                      <span>{t.destination} · {dateTimeStr(t.datetime)} · {t.createdByName}</span>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
+            </div>
+          ))
+        ) : (
+          <div className="day-summary-list">
+            {daySummaries.map(day => {
+              const isOpen = expandedDates.has(day.date);
+              return (
+                <div key={day.date} className="day-summary-block">
+                  <button className="day-summary-row" onClick={() => toggleExpand(day.date)}>
+                    <div className="day-summary-top">
+                      <span className="day-summary-date">{dateHeading(day.date)}</span>
+                      <ChevronRight size={16} className={`day-chevron ${isOpen ? 'day-chevron-open' : ''}`} />
+                    </div>
+                    <div className="day-summary-bottom">
+                      <span>In {peso(day.totalIn)} · Out {peso(day.totalOut)}</span>
+                      <span>{day.txns.length} Transactions</span>
+                    </div>
+                    <div className="day-summary-meta">{day.employees.join(' • ')} ({day.startTime} – {day.endTime})</div>
+                  </button>
+                  {isOpen && (
+                    <div className="receipt-list day-summary-expanded">
+                      {day.txns.map(t => (
+                        <div key={t.id} className="receipt-row">
+                          <div className="receipt-row-top">
+                            <span className="receipt-cat">{t.category}</span>
+                            <span className={`receipt-amt ${t.type === 'Cash In' ? 'amt-in' : 'amt-out'}`}>
+                              {t.type === 'Cash In' ? '+' : '−'}{peso(t.amount)}
+                            </span>
+                          </div>
+                          <div className="receipt-row-bottom">
+                            <span>{t.description || '—'} · {t.id}</span>
+                            <span>{t.destination} · {timeStr(t.datetime)} · {t.createdByName}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
         <div className="receipt-tear receipt-tear-bottom" />
       </div>
+
+      {showFilter && (
+        <TransactionFilterModal
+          category={filterCategory} type={filterType} destination={filterDestination}
+          onChangeCategory={setFilterCategory} onChangeType={setFilterType} onChangeDestination={setFilterDestination}
+          onReset={resetFilters}
+          onClose={() => setShowFilter(false)}
+        />
+      )}
 
       <div className="receipt-panel" style={{ marginTop: 14 }}>
         <div className="receipt-tear" />
@@ -1133,6 +1251,43 @@ function ReportsView({ transactions, attendance, closings }) {
   );
 }
 
+function TransactionFilterModal({ category, type, destination, onChangeCategory, onChangeType, onChangeDestination, onReset, onClose }) {
+  return (
+    <Modal title="Filter transactions" onClose={onClose}>
+      <label className="field-label" style={{ marginTop: 0 }}>Category</label>
+      <select className="field-input" value={category} onChange={e => onChangeCategory(e.target.value)}>
+        <option value="All">All categories</option>
+        {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+      </select>
+
+      <label className="field-label">Type</label>
+      <div className="toggle-row">
+        {['All', 'Cash In', 'Cash Out'].map(v => (
+          <button
+            key={v}
+            className={`toggle-btn ${type === v ? (v === 'Cash Out' ? 'toggle-on-red' : v === 'Cash In' ? 'toggle-on-green' : 'toggle-on-blue') : ''}`}
+            onClick={() => onChangeType(v)}
+          >
+            {v}
+          </button>
+        ))}
+      </div>
+
+      <label className="field-label">Destination</label>
+      <div className="toggle-row">
+        {['All', 'Cash', 'GCash'].map(v => (
+          <button key={v} className={`toggle-btn ${destination === v ? 'toggle-on-blue' : ''}`} onClick={() => onChangeDestination(v)}>{v}</button>
+        ))}
+      </div>
+
+      <div className="filter-modal-actions">
+        <button className="btn btn-outline btn-block" onClick={onReset}>Reset filters</button>
+        <button className="btn btn-highlight btn-block" onClick={onClose}><Check size={16} /> Apply</button>
+      </div>
+    </Modal>
+  );
+}
+
 function AnalyticsView({ employees, attendance, transactions, closings }) {
   const hoursByEmployee = useMemo(() => {
     const totals = {};
@@ -1167,7 +1322,7 @@ function AnalyticsView({ employees, attendance, transactions, closings }) {
     return `${hh}h ${mm}m`;
   };
 
-  const exportTransactions = () => {
+const exportTransactions = () => {
     const csv = toCSV(transactions, [
       { label: 'ID', value: t => t.id },
       { label: 'Date/Time', value: t => dateTimeStr(t.datetime) },
@@ -1182,7 +1337,7 @@ function AnalyticsView({ employees, attendance, transactions, closings }) {
     downloadCSV(`transactions-${todayStr()}.csv`, csv);
   };
 
-const exportAttendance = () => {
+  const exportAttendance = () => {
     const csv = toCSV(attendance, [
       { label: 'Employee', value: a => a.employeeName },
       { label: 'Role', value: a => a.role },
@@ -1906,6 +2061,26 @@ html, body {
 .receipt-tear-bottom { transform: rotate(180deg); margin-top: 8px; }
 
 .receipt-panel-alert { background: var(--highlight); }
+
+.search-filter-row { display: flex; gap: 8px; margin: 10px 0 4px; }
+.search-input-wrap { flex: 1; position: relative; }
+.search-input-icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--ink-soft); }
+.search-input { padding-left: 32px; }
+.filter-btn { white-space: nowrap; padding: 9px 14px; }
+.filter-btn-active { border-color: var(--rule-blue); color: var(--rule-blue); background: #E3F4F5; }
+.filter-modal-actions { display: flex; gap: 8px; margin-top: 16px; }
+
+.day-summary-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.day-summary-block { background: #fff; border: 1px solid var(--paper-dark); border-radius: 10px; overflow: hidden; }
+.day-summary-row { width: 100%; text-align: left; background: none; border: none; padding: 11px 14px; cursor: pointer; font-family: inherit; }
+.day-summary-top { display: flex; align-items: center; justify-content: space-between; }
+.day-summary-date { font-weight: 600; font-size: 12.5px; }
+.day-chevron { color: var(--ink-soft); transition: transform 0.15s; }
+.day-chevron-open { transform: rotate(90deg); }
+.day-summary-bottom { display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-soft); margin-top: 4px; }
+.day-summary-meta { font-size: 10.5px; color: var(--ink-soft); margin-top: 2px; }
+.day-summary-expanded { padding: 0 14px 10px; border-top: 1px dashed #C9C0AA; margin-top: 4px; }
+
 .receipt-panel-alert .receipt-header { color: #fff; }
 .receipt-panel-alert .receipt-count { color: rgba(255,255,255,0.85); }
 .receipt-panel-alert .receipt-row { border-top-color: rgba(255,255,255,0.35); }
@@ -2032,3 +2207,4 @@ html, body {
 .report-row-date { font-family: 'IBM Plex Mono', monospace; font-weight: 500; color: var(--ink-soft); font-size: 11px; }
 .report-row-bottom { display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-soft); margin-top: 3px; }
 `;
+
