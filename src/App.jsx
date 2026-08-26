@@ -621,7 +621,7 @@ const resetLogin = () => { setLoginPicked(null); setPin(''); setLoginError(''); 
   };
 
   const canManage = currentEmployee && (currentEmployee.role === 'Admin' || currentEmployee.role === 'Manager' || currentEmployee.role === 'Owner');
-  const canSeeReports = currentEmployee && (currentEmployee.role === 'Admin' || currentEmployee.role === 'Owner');
+  const canSeeReports = currentEmployee && (currentEmployee.role === 'Admin' || currentEmployee.role === 'Manager' || currentEmployee.role === 'Owner');
 
   if (!loaded) {
     return (
