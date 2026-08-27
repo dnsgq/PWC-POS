@@ -157,3 +157,23 @@ export async function deletePushSubscription(endpoint) {
   if (error) throw error;
 }
 
+// ---- category spending limits ----
+
+export async function fetchCategoryLimits() {
+  const { data, error } = await supabase.from('category_limits').select('*');
+  if (error) throw error;
+  return data.map(r => ({ category: r.category, monthlyLimit: Number(r.monthly_limit), updatedBy: r.updated_by }));
+}
+
+export async function upsertCategoryLimit(category, monthlyLimit, updatedBy) {
+  const { error } = await supabase.from('category_limits').upsert({
+    category, monthly_limit: monthlyLimit, updated_by: updatedBy, updated_at: new Date().toISOString(),
+  }, { onConflict: 'category' });
+  if (error) throw error;
+}
+
+export async function deleteCategoryLimit(category) {
+  const { error } = await supabase.from('category_limits').delete().eq('category', category);
+  if (error) throw error;
+}
+
