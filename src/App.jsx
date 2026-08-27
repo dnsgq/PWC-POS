@@ -5,7 +5,7 @@ import {
   Users, Receipt, Trash2, CalendarClock, ChevronRight, Home, ListOrdered, FileBarChart2,
   UserMinus, PieChart, Download, TimerReset, AlertTriangle, SlidersHorizontal, Search
 } from 'lucide-react';
-import { fetchEmployees, insertEmployee, updateEmployeeActive, fetchAttendance, insertAttendance, clockOutAttendance, fetchTransactions, insertTransaction, fetchClosings, upsertClosing, fetchPushSubscriptionForEndpoint, savePushSubscription, deletePushSubscription, uploadClosingPhoto } from './api';
+import { fetchEmployees, insertEmployee, updateEmployeeActive, fetchAttendance, insertAttendance, clockOutAttendance, fetchTransactions, insertTransaction, fetchClosings, upsertClosing, fetchPushSubscriptionForEndpoint, savePushSubscription, deletePushSubscription, uploadClosingPhoto, fetchCategoryLimits, upsertCategoryLimit, deleteCategoryLimit } from './api';
 import { supabase } from './supabaseClient';
 
 const LOGO_ICON = 'data:image/jpeg;base64,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';
@@ -203,6 +203,7 @@ export default function App() {
   }, []);
   const [transactions, setTransactions] = useState([]);
   const [closings, setClosings] = useState([]);
+  const [categoryLimits, setCategoryLimits] = useState([]);
 
   const [now, setNow] = useState(new Date());
   const [currentEmployee, setCurrentEmployee] = useState(null);
@@ -252,13 +253,41 @@ export default function App() {
     setAttendance(rows);
   };
 
+  const categoryLimitsRef = useRef([]);
+  useEffect(() => { categoryLimitsRef.current = categoryLimits; }, [categoryLimits]);
+  const notifiedLimitsRef = useRef(new Set());
+
   const syncTransactions = async () => {
     const rows = await fetchTransactions();
-    if (knownTransactionIdsRef.current) {
-      for (const t of rows) {
-        if (!knownTransactionIdsRef.current.has(t.id) && !pendingIdsRef.current.has(t.id)) {
-          const sign = t.type === 'Cash In' ? '+' : '−';
-          pushToast(`${t.createdByName} added ${sign}${peso(t.amount)} (${t.category})`);
+    const isFirstLoad = !knownTransactionIdsRef.current;
+    const newRows = knownTransactionIdsRef.current
+      ? rows.filter(t => !knownTransactionIdsRef.current.has(t.id) && !pendingIdsRef.current.has(t.id))
+      : [];
+    for (const t of newRows) {
+      const sign = t.type === 'Cash In' ? '+' : '−';
+      pushToast(`${t.createdByName} added ${sign}${peso(t.amount)} (${t.category})`);
+    }
+    if (!isFirstLoad) {
+      for (const t of newRows) {
+        if (t.type !== 'Cash Out') continue;
+        const limitRow = categoryLimitsRef.current.find(l => l.category === t.category);
+        if (!limitRow) continue;
+        const monthKey = localDateKey(t.datetime).slice(0, 7);
+        const dedupeKey = `${t.category}-${monthKey}`;
+        if (notifiedLimitsRef.current.has(dedupeKey)) continue;
+        let totalThisMonth = 0;
+        for (const tx of rows) {
+          if (tx.type === 'Cash Out' && tx.category === t.category && localDateKey(tx.datetime).slice(0, 7) === monthKey) {
+            totalThisMonth += Number(tx.amount) || 0;
+          }
+        }
+        const totalBefore = totalThisMonth - (Number(t.amount) || 0);
+        if (totalThisMonth >= limitRow.monthlyLimit && totalBefore < limitRow.monthlyLimit) {
+          notifiedLimitsRef.current.add(dedupeKey);
+          const me = currentEmployeeRef.current;
+          if (me && ['Manager', 'Admin', 'Owner'].includes(me.role)) {
+            pushToast(`Spending limit reached: ${t.category} hit ${peso(totalThisMonth)} this month`);
+          }
         }
       }
     }
@@ -304,10 +333,11 @@ export default function App() {
   useEffect(() => {
     (async () => {
       try {
-        const [e] = await Promise.all([
-          fetchEmployees(), syncAttendance(), syncTransactions(), syncClosings(),
+        const [e, , , , limits] = await Promise.all([
+          fetchEmployees(), syncAttendance(), syncTransactions(), syncClosings(), fetchCategoryLimits(),
         ]);
         setEmployees(e);
+        setCategoryLimits(limits);
         const savedId = localStorage.getItem('pwc_pos_employee_id');
         if (savedId) {
           const savedEmployee = e.find(emp => emp.id === savedId && emp.active !== false);
@@ -322,7 +352,7 @@ export default function App() {
     })();
   }, []);
 
-  useEffect(() => {
+useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
@@ -340,6 +370,7 @@ export default function App() {
       syncAttendance().catch(console.error);
       syncTransactions().catch(console.error);
       syncClosings().catch(console.error);
+      fetchCategoryLimits().then(setCategoryLimits).catch(console.error);
     };
 
     const channel = supabase.channel('pos-changes')
@@ -354,6 +385,9 @@ export default function App() {
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'closings' }, () => {
         syncClosings().catch(console.error);
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'category_limits' }, () => {
+        fetchCategoryLimits().then(setCategoryLimits).catch(console.error);
       })
       .subscribe((status) => {
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
@@ -440,6 +474,21 @@ export default function App() {
     return [...activityDates].filter(d => d < today && !closedDates.has(d)).sort();
   }, [transactions, attendance, closings, today]);
 
+  const currentMonthKey = today.slice(0, 7);
+  const overLimitCategories = useMemo(() => {
+    if (categoryLimits.length === 0) return [];
+    const spentByCategory = {};
+    for (const t of transactions) {
+      if (t.type !== 'Cash Out') continue;
+      if (localDateKey(t.datetime).slice(0, 7) !== currentMonthKey) continue;
+      spentByCategory[t.category] = (spentByCategory[t.category] || 0) + (Number(t.amount) || 0);
+    }
+    return categoryLimits
+      .map(l => ({ category: l.category, limit: l.monthlyLimit, spent: spentByCategory[l.category] || 0 }))
+      .filter(r => r.spent >= r.limit)
+      .sort((a, b) => (b.spent - b.limit) - (a.spent - a.limit));
+  }, [categoryLimits, transactions, currentMonthKey]);
+
   const [resolvingDate, setResolvingDate] = useState(null);
 
   const expectedForDate = (dateStr) => {
@@ -496,7 +545,7 @@ export default function App() {
     }
   };
 
-const resetLogin = () => { setLoginPicked(null); setPin(''); setLoginError(''); };
+  const resetLogin = () => { setLoginPicked(null); setPin(''); setLoginError(''); };
 
   const tryPin = async (nextPin) => {
     setPin(nextPin);
@@ -620,8 +669,22 @@ const resetLogin = () => { setLoginPicked(null); setPin(''); setLoginError(''); 
     } catch (err) { console.error('Updating employee failed', err); }
   };
 
+  const saveCategoryLimit = async (category, monthlyLimit) => {
+    try {
+      await upsertCategoryLimit(category, monthlyLimit, currentEmployee.name);
+      setCategoryLimits(prev => [...prev.filter(l => l.category !== category), { category, monthlyLimit, updatedBy: currentEmployee.name }]);
+    } catch (err) { console.error('Saving spending limit failed', err); }
+  };
+
+  const deleteCategoryLimitAction = async (category) => {
+    try {
+      await deleteCategoryLimit(category);
+      setCategoryLimits(prev => prev.filter(l => l.category !== category));
+    } catch (err) { console.error('Removing spending limit failed', err); }
+  };
+
   const canManage = currentEmployee && (currentEmployee.role === 'Admin' || currentEmployee.role === 'Manager' || currentEmployee.role === 'Owner');
-  const canSeeReports = currentEmployee && (currentEmployee.role === 'Admin' || currentEmployee.role === 'Manager' || currentEmployee.role === 'Owner');
+  const canSeeReports = currentEmployee && (currentEmployee.role === 'Admin' || currentEmployee.role === 'Owner');
 
   if (!loaded) {
     return (
@@ -733,6 +796,17 @@ const resetLogin = () => { setLoginPicked(null); setPin(''); setLoginError(''); 
                 {missedDays.length === 1
                   ? `${missedDays[0]} was never closed — tap to resolve`
                   : `${missedDays.length} days were never closed — tap to resolve`}
+              </span>
+            </button>
+          )}
+
+          {overLimitCategories.length > 0 && canManage && (
+            <button className="missed-day-banner spending-limit-banner" onClick={() => setActiveView('reports')}>
+              <AlertTriangle size={16} />
+              <span>
+                {overLimitCategories.length === 1
+                  ? `${overLimitCategories[0].category} is over its spending limit this month`
+                  : `${overLimitCategories.length} categories are over their spending limit this month`}
               </span>
             </button>
           )}
@@ -854,7 +928,7 @@ const resetLogin = () => { setLoginPicked(null); setPin(''); setLoginError(''); 
       )}
 
       {activeView === 'reports' && canSeeReports && (
-        <ReportsView transactions={transactions} attendance={attendance} closings={closings} />
+        <ReportsView transactions={transactions} attendance={attendance} closings={closings} categoryLimits={categoryLimits} />
       )}
 
       {activeView === 'analytics' && canSeeReports && (
@@ -894,9 +968,12 @@ const resetLogin = () => { setLoginPicked(null); setPin(''); setLoginError(''); 
         <SettingsModal
           employees={employees}
           currentEmployee={currentEmployee}
+          categoryLimits={categoryLimits}
           onClose={() => setShowSettings(false)}
           onAdd={addEmployee}
           onToggle={toggleEmployeeActive}
+          onSaveLimit={saveCategoryLimit}
+          onDeleteLimit={deleteCategoryLimitAction}
         />
       )}
       {showCloseDay && closingDraft && (
@@ -988,7 +1065,7 @@ function TransactionsView({ transactions }) {
   );
 }
 
-function ReportsView({ transactions, attendance, closings }) {
+function ReportsView({ transactions, attendance, closings, categoryLimits }) {
   const txns = useMemo(() => [...transactions].sort((a, b) => b.datetime.localeCompare(a.datetime)), [transactions]);
   const att = useMemo(() => [...attendance].sort((a, b) => (b.clockIn || '').localeCompare(a.clockIn || '')), [attendance]);
   const cls = useMemo(() => [...closings].sort((a, b) => b.date.localeCompare(a.date)), [closings]);
@@ -999,6 +1076,21 @@ function ReportsView({ transactions, attendance, closings }) {
       Math.abs(c.gcashDifference || 0) >= DISCREPANCY_THRESHOLD
     )
   ), [cls]);
+
+  const currentMonthKey = todayStr().slice(0, 7);
+  const overLimitCategories = useMemo(() => {
+    if (!categoryLimits || categoryLimits.length === 0) return [];
+    const spentByCategory = {};
+    for (const t of txns) {
+      if (t.type !== 'Cash Out') continue;
+      if (localDateKey(t.datetime).slice(0, 7) !== currentMonthKey) continue;
+      spentByCategory[t.category] = (spentByCategory[t.category] || 0) + (Number(t.amount) || 0);
+    }
+    return categoryLimits
+      .map(l => ({ category: l.category, limit: l.monthlyLimit, spent: spentByCategory[l.category] || 0 }))
+      .filter(r => r.spent >= r.limit)
+      .sort((a, b) => (b.spent - b.limit) - (a.spent - a.limit));
+  }, [categoryLimits, txns, currentMonthKey]);
 
   const [searchText, setSearchText] = useState('');
   const [showFilter, setShowFilter] = useState(false);
@@ -1088,6 +1180,29 @@ function ReportsView({ transactions, attendance, closings }) {
             ))}
           </div>
           <div className="receipt-tear receipt-tear-bottom receipt-tear-alert" />
+        </div>
+      )}
+
+      {overLimitCategories.length > 0 && (
+        <div className="receipt-panel receipt-panel-limit" style={{ marginTop: 14 }}>
+          <div className="receipt-tear receipt-tear-limit" />
+          <div className="receipt-header">
+            <AlertTriangle size={14} /> Spending limit alerts <span className="receipt-count">{overLimitCategories.length}</span>
+          </div>
+          <div className="receipt-list">
+            {overLimitCategories.map(r => (
+              <div key={r.category} className="receipt-row">
+                <div className="receipt-row-top">
+                  <span className="receipt-cat">{r.category}</span>
+                  <span className="receipt-amt">{peso(r.spent)} / {peso(r.limit)}</span>
+                </div>
+                <div className="receipt-row-bottom">
+                  <span>Over by {peso(r.spent - r.limit)} this month</span>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="receipt-tear receipt-tear-bottom receipt-tear-limit" />
         </div>
       )}
 
@@ -1543,15 +1658,35 @@ function TxnModal({ onClose, onSave, activeCashiers, defaultCreatedBy }) {
   );
 }
 
-function SettingsModal({ employees, currentEmployee, onClose, onAdd, onToggle }) {
+function SettingsModal({ employees, currentEmployee, categoryLimits, onClose, onAdd, onToggle, onSaveLimit, onDeleteLimit }) {
   const [name, setName] = useState('');
   const [pinVal, setPinVal] = useState('');
   const [role, setRole] = useState('Employee');
   const [error, setError] = useState('');
   const [notifStatus, setNotifStatus] = useState('checking');
   const [notifError, setNotifError] = useState('');
+  const [limitInputs, setLimitInputs] = useState(() => {
+    const initial = {};
+    for (const c of CATEGORIES) {
+      const existing = categoryLimits.find(l => l.category === c);
+      initial[c] = existing ? String(existing.monthlyLimit) : '';
+    }
+    return initial;
+  });
+  const [limitSaved, setLimitSaved] = useState('');
 
   const canGetNotifications = currentEmployee && ['Manager', 'Admin', 'Owner'].includes(currentEmployee.role);
+
+  const handleSaveLimit = async (category) => {
+    const val = limitInputs[category];
+    if (val.trim() === '') {
+      await onDeleteLimit(category);
+    } else {
+      await onSaveLimit(category, Number(val));
+    }
+    setLimitSaved(category);
+    setTimeout(() => setLimitSaved(''), 1500);
+  };
 
   useEffect(() => {
     if (!canGetNotifications) return;
@@ -1573,7 +1708,7 @@ function SettingsModal({ employees, currentEmployee, onClose, onAdd, onToggle })
     }
   };
 
-  const handleDisableNotifs = async () => {
+const handleDisableNotifs = async () => {
     setNotifError('');
     setNotifStatus('working');
     try {
@@ -1612,6 +1747,25 @@ function SettingsModal({ employees, currentEmployee, onClose, onAdd, onToggle })
             </button>
           )}
           {notifError && <div className="error-line"><AlertCircle size={14} /> {notifError}</div>}
+          <div className="divider" />
+
+          <div className="modal-sub" style={{ marginTop: 0 }}>Monthly spending limits</div>
+          <p className="hint-line">Leave blank for no limit. You'll be alerted when a category's Cash Out total reaches its limit for the month.</p>
+          <div className="limits-list">
+            {CATEGORIES.map(c => (
+              <div key={c} className="limit-row">
+                <span className="limit-row-name">{c}</span>
+                <input
+                  className="field-input mono-input limit-input"
+                  type="number" min="0" step="1" placeholder="No limit"
+                  value={limitInputs[c]}
+                  onChange={e => setLimitInputs({ ...limitInputs, [c]: e.target.value })}
+                  onBlur={() => handleSaveLimit(c)}
+                />
+                {limitSaved === c && <Check size={14} className="limit-saved-check" />}
+              </div>
+            ))}
+          </div>
           <div className="divider" />
         </>
       )}
@@ -2041,6 +2195,7 @@ html, body {
   border: none; border-radius: 10px; padding: 10px 14px; font-size: 12.5px; font-weight: 600;
   margin-bottom: 12px; cursor: pointer; font-family: inherit; text-align: left;
 }
+.spending-limit-banner { background: var(--brand-purple); }
 
 .closed-badge { display: flex; align-items: center; justify-content: center; gap: 6px; background: var(--success-bg); color: var(--success); border-radius: 10px; padding: 10px 14px; font-size: 13px; font-weight: 600; }
 .closed-badge-btn { border: 1px solid var(--success); cursor: pointer; font-family: inherit; }
@@ -2088,6 +2243,21 @@ html, body {
 .receipt-panel-alert .receipt-amt { color: #fff; }
 .receipt-panel-alert .receipt-row-bottom { color: rgba(255,255,255,0.9); }
 .receipt-tear-alert { background-image: linear-gradient(-45deg, var(--highlight) 6px, transparent 0), linear-gradient(45deg, var(--highlight) 6px, transparent 0); }
+
+.receipt-panel-limit { background: var(--brand-purple); }
+.receipt-panel-limit .receipt-header { color: #fff; }
+.receipt-panel-limit .receipt-count { color: rgba(255,255,255,0.85); }
+.receipt-panel-limit .receipt-row { border-top-color: rgba(255,255,255,0.35); }
+.receipt-panel-limit .receipt-cat { color: #fff; }
+.receipt-panel-limit .receipt-amt { color: #fff; }
+.receipt-panel-limit .receipt-row-bottom { color: rgba(255,255,255,0.9); }
+.receipt-tear-limit { background-image: linear-gradient(-45deg, var(--brand-purple) 6px, transparent 0), linear-gradient(45deg, var(--brand-purple) 6px, transparent 0); }
+
+.limits-list { display: flex; flex-direction: column; gap: 6px; max-height: 280px; overflow-y: auto; }
+.limit-row { display: flex; align-items: center; gap: 8px; }
+.limit-row-name { flex: 1; font-size: 12px; }
+.limit-input { width: 100px; text-align: right; }
+.limit-saved-check { color: var(--success); flex-shrink: 0; }
 
 .toast-stack {
   position: fixed; top: 14px; left: 50%; transform: translateX(-50%); z-index: 60;
