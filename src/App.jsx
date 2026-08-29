@@ -5,7 +5,7 @@ import {
   Users, Receipt, Trash2, CalendarClock, ChevronRight, Home, ListOrdered, FileBarChart2,
   UserMinus, PieChart, Download, TimerReset, AlertTriangle, SlidersHorizontal, Search
 } from 'lucide-react';
-import { fetchEmployees, insertEmployee, updateEmployeeActive, fetchAttendance, insertAttendance, clockOutAttendance, fetchTransactions, insertTransaction, fetchClosings, upsertClosing, fetchPushSubscriptionForEndpoint, savePushSubscription, deletePushSubscription, uploadClosingPhoto, fetchCategoryLimits, upsertCategoryLimit, deleteCategoryLimit } from './api';
+import { fetchEmployees, insertEmployee, updateEmployeeActive, fetchAttendance, insertAttendance, clockOutAttendance, fetchTransactions, insertTransaction, updateTransaction, voidTransaction, fetchClosings, upsertClosing, fetchPushSubscriptionForEndpoint, savePushSubscription, deletePushSubscription, uploadClosingPhoto, fetchCategoryLimits, upsertCategoryLimit, deleteCategoryLimit } from './api';
 import { supabase } from './supabaseClient';
 
 const LOGO_ICON = 'data:image/jpeg;base64,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';
@@ -352,7 +352,7 @@ export default function App() {
     })();
   }, []);
 
-useEffect(() => {
+  useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
@@ -414,7 +414,7 @@ useEffect(() => {
   const isClockedIn = !!myAttendance;
 
   const todaysTxns = useMemo(
-    () => transactions.filter(t => localDateKey(t.datetime) === today).sort((a, b) => b.datetime.localeCompare(a.datetime)),
+    () => transactions.filter(t => !t.voided && localDateKey(t.datetime) === today).sort((a, b) => b.datetime.localeCompare(a.datetime)),
     [transactions, today]
   );
 
@@ -446,6 +446,7 @@ useEffect(() => {
     let cash = lastClosedClosing.countedCash || 0;
     let gcash = lastClosedClosing.countedGCash || 0;
     for (const t of transactions) {
+      if (t.voided) continue;
       const d = localDateKey(t.datetime);
       if (d > lastClosedClosing.date && d < targetDate) {
         const amt = Number(t.amount) || 0;
@@ -479,6 +480,7 @@ useEffect(() => {
     if (categoryLimits.length === 0) return [];
     const spentByCategory = {};
     for (const t of transactions) {
+      if (t.voided) continue;
       if (t.type !== 'Cash Out') continue;
       if (localDateKey(t.datetime).slice(0, 7) !== currentMonthKey) continue;
       spentByCategory[t.category] = (spentByCategory[t.category] || 0) + (Number(t.amount) || 0);
@@ -507,6 +509,7 @@ useEffect(() => {
     }
     let cashIn = 0, cashOut = 0, gcashIn = 0, gcashOut = 0;
     for (const t of transactions) {
+      if (t.voided) continue;
       if (localDateKey(t.datetime) !== dateStr) continue;
       const amt = Number(t.amount) || 0;
       if (t.destination === 'Cash') { t.type === 'Cash In' ? cashIn += amt : cashOut += amt; }
@@ -619,6 +622,66 @@ useEffect(() => {
       setTransactions(prev => [...prev, rec]);
       setShowTxn(false);
     } catch (err) { console.error('Adding transaction failed', err); }
+  };
+
+  const [showBackfill, setShowBackfill] = useState(false);
+  const [backfillError, setBackfillError] = useState('');
+
+  const addBackfillTransaction = async (form) => {
+    setBackfillError('');
+    try {
+      const rec = {
+        id: uid('TXN'),
+        amount: Number(form.amount),
+        description: form.description,
+        type: form.type,
+        destination: form.destination,
+        category: form.category,
+        datetime: form.datetime,
+        notes: form.reason,
+        createdBy: form.createdBy,
+        createdByName: employees.find(e => e.id === form.createdBy)?.name || currentEmployee.name,
+        isBackfill: true,
+      };
+      await insertTransaction(rec);
+      markOwnAction(rec.id);
+      setTransactions(prev => [...prev, rec]);
+      setShowBackfill(false);
+    } catch (err) {
+      console.error('Adding backfill transaction failed', err);
+      setBackfillError('Something went wrong saving this. Please try again.');
+    }
+  };
+
+  const [editingTxn, setEditingTxn] = useState(null);
+  const [txnActionError, setTxnActionError] = useState('');
+
+  const editTransactionAction = async (id, fields, reason) => {
+    setTxnActionError('');
+    try {
+      await updateTransaction(id, fields, currentEmployee.name, reason);
+      setTransactions(prev => prev.map(t => t.id === id ? {
+        ...t, ...fields, editedBy: currentEmployee.name, editedAt: new Date().toISOString(), editReason: reason,
+      } : t));
+      setEditingTxn(null);
+    } catch (err) {
+      console.error('Editing transaction failed', err);
+      setTxnActionError('Something went wrong saving this edit. Please try again.');
+    }
+  };
+
+  const voidTransactionAction = async (id, reason) => {
+    setTxnActionError('');
+    try {
+      await voidTransaction(id, currentEmployee.name, reason);
+      setTransactions(prev => prev.map(t => t.id === id ? {
+        ...t, voided: true, voidedBy: currentEmployee.name, voidedAt: new Date().toISOString(), voidReason: reason,
+      } : t));
+      setEditingTxn(null);
+    } catch (err) {
+      console.error('Voiding transaction failed', err);
+      setTxnActionError('Something went wrong voiding this. Please try again.');
+    }
   };
 
   const openCloseDay = () => {
@@ -928,7 +991,12 @@ useEffect(() => {
       )}
 
       {activeView === 'reports' && canSeeReports && (
-        <ReportsView transactions={transactions} attendance={attendance} closings={closings} categoryLimits={categoryLimits} />
+        <ReportsView
+          transactions={transactions} attendance={attendance} closings={closings} categoryLimits={categoryLimits}
+          canManage={canManage}
+          onEditTxn={setEditingTxn}
+          onAddBackfill={() => setShowBackfill(true)}
+        />
       )}
 
       {activeView === 'analytics' && canSeeReports && (
@@ -1007,6 +1075,24 @@ useEffect(() => {
           onResolve={resolveMissedDay}
         />
       )}
+      {showBackfill && (
+        <BackfillEntryModal
+          employees={employees}
+          defaultCreatedBy={currentEmployee.id}
+          externalError={backfillError}
+          onClose={() => { setShowBackfill(false); setBackfillError(''); }}
+          onSave={addBackfillTransaction}
+        />
+      )}
+      {editingTxn && (
+        <TxnEditModal
+          transaction={editingTxn}
+          externalError={txnActionError}
+          onClose={() => { setEditingTxn(null); setTxnActionError(''); }}
+          onSaveEdit={editTransactionAction}
+          onVoid={voidTransactionAction}
+        />
+      )}
     </div>
   );
 }
@@ -1029,7 +1115,7 @@ function dateHeading(dateStr) {
 function TransactionsView({ transactions }) {
   const today = todayStr();
   const todays = useMemo(
-    () => transactions.filter(t => localDateKey(t.datetime) === today).sort((a, b) => b.datetime.localeCompare(a.datetime)),
+    () => transactions.filter(t => !t.voided && localDateKey(t.datetime) === today).sort((a, b) => b.datetime.localeCompare(a.datetime)),
     [transactions, today]
   );
 
@@ -1065,7 +1151,7 @@ function TransactionsView({ transactions }) {
   );
 }
 
-function ReportsView({ transactions, attendance, closings, categoryLimits }) {
+function ReportsView({ transactions, attendance, closings, categoryLimits, canManage, onEditTxn, onAddBackfill }) {
   const txns = useMemo(() => [...transactions].sort((a, b) => b.datetime.localeCompare(a.datetime)), [transactions]);
   const att = useMemo(() => [...attendance].sort((a, b) => (b.clockIn || '').localeCompare(a.clockIn || '')), [attendance]);
   const cls = useMemo(() => [...closings].sort((a, b) => b.date.localeCompare(a.date)), [closings]);
@@ -1125,9 +1211,10 @@ function ReportsView({ transactions, attendance, closings, categoryLimits }) {
       let totalIn = 0, totalOut = 0;
       const employeeSet = new Set();
       for (const t of dayTxns) {
+        employeeSet.add(t.createdByName);
+        if (t.voided) continue;
         const amt = Number(t.amount) || 0;
         if (t.type === 'Cash In') totalIn += amt; else totalOut += amt;
-        employeeSet.add(t.createdByName);
       }
       const sortedTimes = [...dayTxns].sort((a, b) => a.datetime.localeCompare(b.datetime));
       return {
@@ -1212,6 +1299,12 @@ function ReportsView({ transactions, attendance, closings, categoryLimits }) {
           <Receipt size={14} /> All transactions <span className="receipt-count">{filteredTxns.length}</span>
         </div>
 
+        {canManage && (
+          <button className="btn btn-purple btn-block" style={{ marginBottom: 10 }} onClick={onAddBackfill}>
+            <Plus size={14} /> Add backdated entry
+          </button>
+        )}
+
         <div className="search-filter-row">
           <div className="search-input-wrap">
             <Search size={14} className="search-input-icon" />
@@ -1235,9 +1328,18 @@ function ReportsView({ transactions, attendance, closings, categoryLimits }) {
               <div className="date-group-heading">{dateHeading(day.date)}</div>
               <div className="receipt-list">
                 {day.txns.map(t => (
-                  <div key={t.id} className="receipt-row">
+                  <div
+                    key={t.id}
+                    className={`receipt-row ${canManage ? 'receipt-row-editable' : ''} ${t.voided ? 'receipt-row-voided' : ''}`}
+                    onClick={canManage ? () => onEditTxn(t) : undefined}
+                  >
                     <div className="receipt-row-top">
-                      <span className="receipt-cat">{t.category}</span>
+                      <span className="receipt-cat">
+                        {t.category}
+                        {t.voided && <span className="row-badge row-badge-voided">VOIDED</span>}
+                        {t.isBackfill && <span className="row-badge row-badge-backfill">BACKDATED</span>}
+                        {!t.voided && t.editedBy && <span className="row-badge row-badge-edited">EDITED</span>}
+                      </span>
                       <span className={`receipt-amt ${t.type === 'Cash In' ? 'amt-in' : 'amt-out'}`}>
                         {t.type === 'Cash In' ? '+' : '−'}{peso(t.amount)}
                       </span>
@@ -1271,9 +1373,18 @@ function ReportsView({ transactions, attendance, closings, categoryLimits }) {
                   {isOpen && (
                     <div className="receipt-list day-summary-expanded">
                       {day.txns.map(t => (
-                        <div key={t.id} className="receipt-row">
+                        <div
+                          key={t.id}
+                          className={`receipt-row ${canManage ? 'receipt-row-editable' : ''} ${t.voided ? 'receipt-row-voided' : ''}`}
+                          onClick={canManage ? () => onEditTxn(t) : undefined}
+                        >
                           <div className="receipt-row-top">
-                            <span className="receipt-cat">{t.category}</span>
+                            <span className="receipt-cat">
+                              {t.category}
+                              {t.voided && <span className="row-badge row-badge-voided">VOIDED</span>}
+                              {t.isBackfill && <span className="row-badge row-badge-backfill">BACKDATED</span>}
+                              {!t.voided && t.editedBy && <span className="row-badge row-badge-edited">EDITED</span>}
+                            </span>
                             <span className={`receipt-amt ${t.type === 'Cash In' ? 'amt-in' : 'amt-out'}`}>
                               {t.type === 'Cash In' ? '+' : '−'}{peso(t.amount)}
                             </span>
@@ -1420,6 +1531,7 @@ function AnalyticsView({ employees, attendance, transactions, closings }) {
   const categoryTotals = useMemo(() => {
     const totals = {};
     for (const t of transactions) {
+      if (t.voided) continue;
       const signed = (t.type === 'Cash In' ? 1 : -1) * (Number(t.amount) || 0);
       totals[t.category] = (totals[t.category] || 0) + signed;
     }
@@ -1448,6 +1560,8 @@ function AnalyticsView({ employees, attendance, transactions, closings }) {
       { label: 'Description', value: t => t.description },
       { label: 'Notes', value: t => t.notes },
       { label: 'Created By', value: t => t.createdByName },
+      { label: 'Status', value: t => t.voided ? `Voided by ${t.voidedBy}: ${t.voidReason}` : (t.editedBy ? `Edited by ${t.editedBy}: ${t.editReason}` : 'Active') },
+      { label: 'Backfilled', value: t => t.isBackfill ? 'Yes' : '' },
     ]);
     downloadCSV(`transactions-${todayStr()}.csv`, csv);
   };
@@ -1658,6 +1772,187 @@ function TxnModal({ onClose, onSave, activeCashiers, defaultCreatedBy }) {
   );
 }
 
+function TxnEditModal({ transaction, externalError, onClose, onSaveEdit, onVoid }) {
+  const [amount, setAmount] = useState(String(transaction.amount));
+  const [description, setDescription] = useState(transaction.description || '');
+  const [category, setCategory] = useState(transaction.category);
+  const [type, setType] = useState(transaction.type);
+  const [destination, setDestination] = useState(transaction.destination);
+  const [editReason, setEditReason] = useState('');
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const [showVoidConfirm, setShowVoidConfirm] = useState(false);
+  const [voidReason, setVoidReason] = useState('');
+  const [voidError, setVoidError] = useState('');
+  const [voiding, setVoiding] = useState(false);
+
+  useEffect(() => {
+    if (externalError) { setError(externalError); setSubmitting(false); setVoidError(externalError); setVoiding(false); }
+  }, [externalError]);
+
+  const submitEdit = () => {
+    setError('');
+    if (!amount || Number(amount) <= 0) { setError('Enter a valid amount.'); return; }
+    if (!description.trim()) { setError('Add a short description.'); return; }
+    if (!editReason.trim()) { setError('Explain why this transaction is being edited.'); return; }
+    setSubmitting(true);
+    onSaveEdit(transaction.id, { amount: Number(amount), description, category, type, destination }, editReason.trim());
+  };
+
+  const submitVoid = () => {
+    setVoidError('');
+    if (!voidReason.trim()) { setVoidError('Explain why this transaction is being voided.'); return; }
+    setVoiding(true);
+    onVoid(transaction.id, voidReason.trim());
+  };
+
+  if (transaction.voided) {
+    return (
+      <Modal title="Transaction voided" onClose={onClose}>
+        <div className="close-summary">
+          <div className="close-row"><span>{transaction.category}</span><span className="mono-val">{peso(transaction.amount)}</span></div>
+          <div className="close-row"><span>Voided by</span><span className="mono-val">{transaction.voidedBy}</span></div>
+          <div className="close-row"><span>Reason</span><span className="mono-val">{transaction.voidReason}</span></div>
+        </div>
+        <button className="btn btn-outline btn-block" style={{ marginTop: 14 }} onClick={onClose}>Close</button>
+      </Modal>
+    );
+  }
+
+  return (
+    <Modal title="Edit transaction" onClose={onClose}>
+      {transaction.isBackfill && <div className="backfill-note">This is a backdated entry.</div>}
+      <div className="toggle-row">
+        {['Cash In', 'Cash Out'].map(v => (
+          <button key={v} className={`toggle-btn ${type === v ? (v === 'Cash In' ? 'toggle-on-green' : 'toggle-on-red') : ''}`} onClick={() => setType(v)}>{v}</button>
+        ))}
+      </div>
+      <div className="toggle-row">
+        {['Cash', 'GCash'].map(v => (
+          <button key={v} className={`toggle-btn ${destination === v ? 'toggle-on-blue' : ''}`} onClick={() => setDestination(v)}>{v}</button>
+        ))}
+      </div>
+
+      <label className="field-label">Amount</label>
+      <input className="field-input mono-input" type="number" min="0" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} />
+
+      <label className="field-label">Description</label>
+      <input className="field-input" value={description} onChange={e => setDescription(e.target.value)} />
+
+      <label className="field-label">Category</label>
+      <select className="field-input" value={category} onChange={e => setCategory(e.target.value)}>
+        {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+      </select>
+
+      <div className="field-static-row">
+        <span>Recorded {dateTimeStr(transaction.datetime)} by {transaction.createdByName}</span>
+      </div>
+
+      <label className="field-label">Reason for this edit (required)</label>
+      <textarea className="field-input" rows={2} value={editReason} onChange={e => setEditReason(e.target.value)} placeholder="e.g. wrong amount typed in" />
+
+      {error && <div className="error-line"><AlertCircle size={14} /> {error}</div>}
+      <button className="btn btn-highlight btn-block" style={{ marginTop: 12 }} onClick={submitEdit} disabled={submitting}>
+        <Check size={16} /> {submitting ? 'Saving…' : 'Save edit'}
+      </button>
+
+      <div className="divider" />
+
+      {!showVoidConfirm ? (
+        <button className="btn btn-danger-outline btn-block" onClick={() => setShowVoidConfirm(true)}>
+          <Trash2 size={16} /> Void this transaction
+        </button>
+      ) : (
+        <>
+          <p className="modal-sub">Voiding keeps this transaction visible for the record, but removes it from all totals. This can't be undone.</p>
+          <label className="field-label" style={{ marginTop: 0 }}>Reason for voiding (required)</label>
+          <textarea className="field-input" rows={2} value={voidReason} onChange={e => setVoidReason(e.target.value)} placeholder="e.g. duplicate entry" />
+          {voidError && <div className="error-line"><AlertCircle size={14} /> {voidError}</div>}
+          <button className="btn btn-danger-outline btn-block" style={{ marginTop: 10 }} onClick={submitVoid} disabled={voiding}>
+            <Trash2 size={16} /> {voiding ? 'Voiding…' : 'Confirm void'}
+          </button>
+        </>
+      )}
+    </Modal>
+  );
+}
+
+function BackfillEntryModal({ employees, defaultCreatedBy, externalError, onClose, onSave }) {
+  const [type, setType] = useState('Cash In');
+  const [destination, setDestination] = useState('Cash');
+  const [amount, setAmount] = useState('');
+  const [description, setDescription] = useState('');
+  const [category, setCategory] = useState(CATEGORIES[0]);
+  const [createdBy, setCreatedBy] = useState(defaultCreatedBy);
+  const [datetime, setDatetime] = useState(() => {
+    const now = new Date();
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+    return now.toISOString().slice(0, 16);
+  });
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (externalError) { setError(externalError); setSubmitting(false); }
+  }, [externalError]);
+
+  const submit = () => {
+    if (!amount || Number(amount) <= 0) { setError('Enter a valid amount.'); return; }
+    if (!description.trim()) { setError('Add a short description.'); return; }
+    if (!reason.trim()) { setError('Explain why this entry is being backdated (e.g. WiFi outage).'); return; }
+    setSubmitting(true);
+    onSave({ type, destination, amount, description, category, createdBy, datetime: new Date(datetime).toISOString(), reason: reason.trim() });
+  };
+
+  return (
+    <Modal title="Add backdated entry" onClose={onClose}>
+      <p className="modal-sub">
+        For recording transactions after the fact — e.g. from a paper notebook during a WiFi outage.
+        This is clearly marked as backfilled and won't affect the normal transaction flow.
+      </p>
+      <div className="toggle-row">
+        {['Cash In', 'Cash Out'].map(v => (
+          <button key={v} className={`toggle-btn ${type === v ? (v === 'Cash In' ? 'toggle-on-green' : 'toggle-on-red') : ''}`} onClick={() => setType(v)}>{v}</button>
+        ))}
+      </div>
+      <div className="toggle-row">
+        {['Cash', 'GCash'].map(v => (
+          <button key={v} className={`toggle-btn ${destination === v ? 'toggle-on-blue' : ''}`} onClick={() => setDestination(v)}>{v}</button>
+        ))}
+      </div>
+
+      <label className="field-label">Amount</label>
+      <input className="field-input mono-input" type="number" min="0" step="0.01" placeholder="0.00" value={amount} onChange={e => setAmount(e.target.value)} />
+
+      <label className="field-label">Description</label>
+      <input className="field-input" placeholder="e.g. 20 pages B&W printing" value={description} onChange={e => setDescription(e.target.value)} />
+
+      <label className="field-label">Category</label>
+      <select className="field-input" value={category} onChange={e => setCategory(e.target.value)}>
+        {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+      </select>
+
+      <label className="field-label">Actual date & time this happened</label>
+      <input className="field-input" type="datetime-local" value={datetime} onChange={e => setDatetime(e.target.value)} />
+
+      <label className="field-label">Who handled this transaction</label>
+      <select className="field-input" value={createdBy} onChange={e => setCreatedBy(e.target.value)}>
+        {employees.filter(e => e.active !== false).map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+      </select>
+
+      <label className="field-label">Reason for backdating (required)</label>
+      <textarea className="field-input" rows={2} value={reason} onChange={e => setReason(e.target.value)} placeholder="e.g. WiFi outage on Aug 27, recorded from notebook" />
+
+      {error && <div className="error-line"><AlertCircle size={14} /> {error}</div>}
+      <button className="btn btn-highlight btn-block" style={{ marginTop: 12 }} onClick={submit} disabled={submitting}>
+        <Check size={16} /> {submitting ? 'Saving…' : 'Save backdated entry'}
+      </button>
+    </Modal>
+  );
+}
+
 function SettingsModal({ employees, currentEmployee, categoryLimits, onClose, onAdd, onToggle, onSaveLimit, onDeleteLimit }) {
   const [name, setName] = useState('');
   const [pinVal, setPinVal] = useState('');
@@ -1708,7 +2003,7 @@ function SettingsModal({ employees, currentEmployee, categoryLimits, onClose, on
     }
   };
 
-const handleDisableNotifs = async () => {
+  const handleDisableNotifs = async () => {
     setNotifError('');
     setNotifStatus('working');
     try {
@@ -1752,7 +2047,7 @@ const handleDisableNotifs = async () => {
           <div className="modal-sub" style={{ marginTop: 0 }}>Monthly spending limits</div>
           <p className="hint-line">Leave blank for no limit. You'll be alerted when a category's Cash Out total reaches its limit for the month.</p>
           <div className="limits-list">
-            {CATEGORIES.map(c => (
+            {CATEGORIES.filter(c => !c.toLowerCase().includes('income')).map(c => (
               <div key={c} className="limit-row">
                 <span className="limit-row-name">{c}</span>
                 <input
@@ -2274,6 +2569,17 @@ html, body {
 .receipt-count { margin-left: auto; font-family: 'IBM Plex Mono', monospace; font-weight: 500; color: var(--ink-soft); font-size: 12px; }
 .receipt-list { display: flex; flex-direction: column; }
 .receipt-row { padding: 9px 0; border-top: 1px dashed #C9C0AA; }
+.receipt-row-editable { cursor: pointer; }
+.receipt-row-editable:active { background: var(--paper-dark); }
+.receipt-row-voided { opacity: 0.55; }
+.receipt-row-voided .receipt-cat, .receipt-row-voided .receipt-amt { text-decoration: line-through; }
+.row-badge { display: inline-block; font-size: 8.5px; font-weight: 700; letter-spacing: 0.3px; padding: 2px 5px; border-radius: 4px; margin-left: 6px; text-decoration: none; vertical-align: middle; }
+.row-badge-voided { background: var(--danger-bg); color: var(--danger); }
+.row-badge-backfill { background: #E3F4F5; color: var(--rule-blue); }
+.row-badge-edited { background: var(--paper-dark); color: var(--ink-soft); }
+.backfill-note { background: #E3F4F5; color: var(--rule-blue); font-size: 11px; font-weight: 600; padding: 8px 12px; border-radius: 8px; margin-bottom: 10px; }
+.field-static-row { font-size: 11px; color: var(--ink-soft); margin: 10px 0; }
+
 .receipt-row:first-child { border-top: none; }
 .receipt-row-top { display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; }
 .receipt-amt { font-family: 'Epilogue', sans-serif; font-weight: 500; }
