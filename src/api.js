@@ -13,6 +13,9 @@ const txnFromDb = (r) => ({
   id: r.id, amount: Number(r.amount), description: r.description, type: r.type,
   destination: r.destination, category: r.category, datetime: r.datetime, notes: r.notes,
   createdBy: r.created_by, createdByName: r.created_by_name,
+  voided: r.voided || false, voidedBy: r.voided_by, voidedAt: r.voided_at, voidReason: r.void_reason,
+  editedBy: r.edited_by, editedAt: r.edited_at, editReason: r.edit_reason,
+  isBackfill: r.is_backfill || false,
 });
 
 const clsFromDb = (r) => ({
@@ -90,7 +93,24 @@ export async function insertTransaction(t) {
     id: t.id, amount: t.amount, description: t.description, type: t.type,
     destination: t.destination, category: t.category, datetime: t.datetime, notes: t.notes,
     created_by: t.createdBy, created_by_name: t.createdByName,
+    is_backfill: t.isBackfill || false,
   });
+  if (error) throw error;
+}
+
+export async function updateTransaction(id, fields, editedBy, editReason) {
+  const { error } = await supabase.from('transactions').update({
+    amount: fields.amount, description: fields.description, type: fields.type,
+    destination: fields.destination, category: fields.category,
+    edited_by: editedBy, edited_at: new Date().toISOString(), edit_reason: editReason,
+  }).eq('id', id);
+  if (error) throw error;
+}
+
+export async function voidTransaction(id, voidedBy, reason) {
+  const { error } = await supabase.from('transactions').update({
+    voided: true, voided_by: voidedBy, voided_at: new Date().toISOString(), void_reason: reason,
+  }).eq('id', id);
   if (error) throw error;
 }
 
