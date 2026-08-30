@@ -7,6 +7,8 @@ const empFromDb = (r) => ({ id: r.id, name: r.name, pin: r.pin, role: r.role, ac
 const attFromDb = (r) => ({
   id: r.id, employeeId: r.employee_id, employeeName: r.employee_name, role: r.role,
   date: r.date, clockIn: r.clock_in, clockOut: r.clock_out,
+  isBackfill: r.is_backfill || false, backfillReason: r.backfill_reason,
+  editedBy: r.edited_by, editedAt: r.edited_at, editReason: r.edit_reason,
 });
 
 const txnFromDb = (r) => ({
@@ -77,6 +79,28 @@ export async function insertAttendance(a) {
 
 export async function clockOutAttendance(id, clockOutIso) {
   const { error } = await supabase.from('attendance').update({ clock_out: clockOutIso }).eq('id', id);
+  if (error) throw error;
+}
+
+export async function insertBackfillAttendance(a) {
+  const { data, error } = await supabase
+    .from('attendance')
+    .insert({
+      employee_id: a.employeeId, employee_name: a.employeeName, role: a.role,
+      date: a.date, clock_in: a.clockIn, clock_out: a.clockOut,
+      is_backfill: true, backfill_reason: a.reason,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return attFromDb(data);
+}
+
+export async function updateAttendanceTimes(id, clockIn, clockOut, editedBy, editReason) {
+  const { error } = await supabase.from('attendance').update({
+    clock_in: clockIn, clock_out: clockOut,
+    edited_by: editedBy, edited_at: new Date().toISOString(), edit_reason: editReason,
+  }).eq('id', id);
   if (error) throw error;
 }
 
