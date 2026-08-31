@@ -36,6 +36,17 @@ const todayStr = (d = new Date()) => {
 // UTC+8 timezone during local midnight-8am (it would still show yesterday's
 // UTC date). This always converts to the device's local calendar date instead.
 const localDateKey = (iso) => todayStr(new Date(iso));
+const mondayOf = (dateKey) => {
+  const d = new Date(dateKey + 'T00:00:00');
+  const diff = (d.getDay() + 6) % 7; // Monday = 0
+  d.setDate(d.getDate() - diff);
+  return todayStr(d);
+};
+const addDaysToKey = (dateKey, n) => {
+  const d = new Date(dateKey + 'T00:00:00');
+  d.setDate(d.getDate() + n);
+  return todayStr(d);
+};
 const uid = (p = 'ID') => `${p}-${Date.now().toString(36).slice(-6)}${Math.random().toString(36).slice(2, 5)}`.toUpperCase();
 const timeStr = (iso) => iso ? new Date(iso).toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' }) : '';
 const dateTimeStr = (iso) => iso ? new Date(iso).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
@@ -789,7 +800,6 @@ export default function App() {
   };
 
   const canManage = currentEmployee && (currentEmployee.role === 'Admin' || currentEmployee.role === 'Manager' || currentEmployee.role === 'Owner');
-  const canSeeReports = currentEmployee && (currentEmployee.role === 'Admin' || currentEmployee.role === 'Owner');
 
   if (!loaded) {
     return (
@@ -1032,7 +1042,7 @@ export default function App() {
         <TransactionsView transactions={transactions} />
       )}
 
-      {activeView === 'reports' && canSeeReports && (
+      {activeView === 'reports' && canManage && (
         <ReportsView
           transactions={transactions} attendance={attendance} closings={closings} categoryLimits={categoryLimits}
           canManage={canManage}
@@ -1043,7 +1053,7 @@ export default function App() {
         />
       )}
 
-      {activeView === 'analytics' && canSeeReports && (
+      {activeView === 'analytics' && canManage && (
         <AnalyticsView employees={employees} attendance={attendance} transactions={transactions} closings={closings} />
       )}
 
@@ -1056,12 +1066,12 @@ export default function App() {
         <button className={`nav-btn ${activeView === 'transactions' ? 'nav-btn-active' : ''}`} onClick={() => setActiveView('transactions')}>
           <ListOrdered size={19} /><span>Transactions</span>
         </button>
-        {canSeeReports && (
+        {canManage && (
           <button className={`nav-btn ${activeView === 'reports' ? 'nav-btn-active' : ''}`} onClick={() => setActiveView('reports')}>
             <FileBarChart2 size={19} /><span>Reports</span>
           </button>
         )}
-        {canSeeReports && (
+        {canManage && (
           <button className={`nav-btn ${activeView === 'analytics' ? 'nav-btn-active' : ''}`} onClick={() => setActiveView('analytics')}>
             <PieChart size={19} /><span>Analytics</span>
           </button>
@@ -1618,6 +1628,49 @@ function AnalyticsView({ employees, attendance, transactions, closings }) {
       .sort((a, b) => b.totalHours - a.totalHours);
   }, [attendance]);
 
+  const computeDigest = (predicate) => {
+    let cashIn = 0, cashOut = 0, count = 0;
+    const catTotals = {};
+    for (const t of transactions) {
+      if (t.voided) continue;
+      const dk = localDateKey(t.datetime);
+      if (!predicate(dk)) continue;
+      count++;
+      const amt = Number(t.amount) || 0;
+      if (t.destination === 'Cash') { t.type === 'Cash In' ? cashIn += amt : cashOut += amt; }
+      const signed = (t.type === 'Cash In' ? 1 : -1) * amt;
+      catTotals[t.category] = (catTotals[t.category] || 0) + signed;
+    }
+    let discrepancyDays = 0;
+    for (const c of closings) {
+      if (c.status !== 'Closed' || !predicate(c.date)) continue;
+      if (Math.abs(c.cashDifference || 0) >= DISCREPANCY_THRESHOLD || Math.abs(c.gcashDifference || 0) >= DISCREPANCY_THRESHOLD) discrepancyDays++;
+    }
+    const topCategories = Object.entries(catTotals)
+      .map(([category, net]) => ({ category, net }))
+      .sort((a, b) => Math.abs(b.net) - Math.abs(a.net))
+      .slice(0, 3);
+    return { cashIn, cashOut, net: cashIn - cashOut, count, topCategories, discrepancyDays };
+  };
+
+  const today = todayStr();
+  const thisMonday = mondayOf(today);
+  const lastWeekStart = addDaysToKey(thisMonday, -7);
+  const lastWeekEnd = addDaysToKey(thisMonday, -1);
+  const weeklyDigest = useMemo(
+    () => computeDigest(dk => dk >= lastWeekStart && dk <= lastWeekEnd),
+    [transactions, closings, lastWeekStart, lastWeekEnd]
+  );
+
+  const [thisYear, thisMonthNum] = today.split('-').map(Number);
+  const lastMonthDate = new Date(thisYear, thisMonthNum - 2, 1);
+  const lastMonthKey = `${lastMonthDate.getFullYear()}-${String(lastMonthDate.getMonth() + 1).padStart(2, '0')}`;
+  const lastMonthLabel = lastMonthDate.toLocaleDateString('en-PH', { month: 'long', year: 'numeric' });
+  const monthlyDigest = useMemo(
+    () => computeDigest(dk => dk.slice(0, 7) === lastMonthKey),
+    [transactions, closings, lastMonthKey]
+  );
+
   const categoryTotals = useMemo(() => {
     const totals = {};
     for (const t of transactions) {
@@ -1721,6 +1774,64 @@ function AnalyticsView({ employees, attendance, transactions, closings }) {
                 </div>
               );
             })}
+          </div>
+        )}
+        <div className="receipt-tear receipt-tear-bottom" />
+      </div>
+
+      <div className="receipt-panel" style={{ marginTop: 14 }}>
+        <div className="receipt-tear" />
+        <div className="receipt-header"><CalendarClock size={14} /> Weekly digest</div>
+        <div className="digest-range">{lastWeekStart} – {lastWeekEnd}</div>
+        {weeklyDigest.count === 0 ? (
+          <div className="empty-state">No transactions recorded that week.</div>
+        ) : (
+          <div className="close-summary" style={{ marginTop: 8 }}>
+            <div className="close-row"><span>Cash in</span><span className="mono-val amt-in">+{peso(weeklyDigest.cashIn)}</span></div>
+            <div className="close-row"><span>Cash out</span><span className="mono-val amt-out">−{peso(weeklyDigest.cashOut)}</span></div>
+            <div className="close-row close-row-total"><span>Net</span><span className="mono-val">{peso(weeklyDigest.net)}</span></div>
+            <div className="close-row"><span>Transactions</span><span className="mono-val">{weeklyDigest.count}</span></div>
+            <div className="close-row"><span>Discrepancy days</span><span className="mono-val">{weeklyDigest.discrepancyDays}</span></div>
+          </div>
+        )}
+        {weeklyDigest.topCategories.length > 0 && (
+          <div className="digest-top-categories">
+            <div className="digest-top-label">Top categories</div>
+            {weeklyDigest.topCategories.map(c => (
+              <div key={c.category} className="digest-top-row">
+                <span>{c.category}</span>
+                <span className={c.net >= 0 ? 'amt-in' : 'amt-out'}>{c.net >= 0 ? '+' : '−'}{peso(Math.abs(c.net))}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="receipt-tear receipt-tear-bottom" />
+      </div>
+
+      <div className="receipt-panel" style={{ marginTop: 14 }}>
+        <div className="receipt-tear" />
+        <div className="receipt-header"><CalendarClock size={14} /> Monthly digest</div>
+        <div className="digest-range">{lastMonthLabel}</div>
+        {monthlyDigest.count === 0 ? (
+          <div className="empty-state">No transactions recorded that month.</div>
+        ) : (
+          <div className="close-summary" style={{ marginTop: 8 }}>
+            <div className="close-row"><span>Cash in</span><span className="mono-val amt-in">+{peso(monthlyDigest.cashIn)}</span></div>
+            <div className="close-row"><span>Cash out</span><span className="mono-val amt-out">−{peso(monthlyDigest.cashOut)}</span></div>
+            <div className="close-row close-row-total"><span>Net</span><span className="mono-val">{peso(monthlyDigest.net)}</span></div>
+            <div className="close-row"><span>Transactions</span><span className="mono-val">{monthlyDigest.count}</span></div>
+            <div className="close-row"><span>Discrepancy days</span><span className="mono-val">{monthlyDigest.discrepancyDays}</span></div>
+          </div>
+        )}
+        {monthlyDigest.topCategories.length > 0 && (
+          <div className="digest-top-categories">
+            <div className="digest-top-label">Top categories</div>
+            {monthlyDigest.topCategories.map(c => (
+              <div key={c.category} className="digest-top-row">
+                <span>{c.category}</span>
+                <span className={c.net >= 0 ? 'amt-in' : 'amt-out'}>{c.net >= 0 ? '+' : '−'}{peso(Math.abs(c.net))}</span>
+              </div>
+            ))}
           </div>
         )}
         <div className="receipt-tear receipt-tear-bottom" />
@@ -1892,7 +2003,7 @@ function TxnEditModal({ transaction, externalError, onClose, onSaveEdit, onVoid 
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const [showVoidConfirm, setShowVoidConfirm] = useState(false);
+const [showVoidConfirm, setShowVoidConfirm] = useState(false);
   const [voidReason, setVoidReason] = useState('');
   const [voidError, setVoidError] = useState('');
   const [voiding, setVoiding] = useState(false);
@@ -1910,7 +2021,7 @@ function TxnEditModal({ transaction, externalError, onClose, onSaveEdit, onVoid 
     onSaveEdit(transaction.id, { amount: Number(amount), description, category, type, destination }, editReason.trim());
   };
 
-  const submitVoid = () => {
+const submitVoid = () => {
     setVoidError('');
     if (!voidReason.trim()) { setVoidError('Explain why this transaction is being voided.'); return; }
     setVoiding(true);
@@ -2834,6 +2945,11 @@ html, body {
 .hours-row:first-child { border-top: none; }
 .hours-row-name { font-size: 13px; font-weight: 600; }
 .hours-row-value { font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: var(--ink-soft); }
+
+.digest-range { font-size: 11px; color: var(--ink-soft); font-family: 'IBM Plex Mono', monospace; margin-top: 2px; }
+.digest-top-categories { margin-top: 10px; padding-top: 8px; border-top: 1px dashed #C9C0AA; }
+.digest-top-label { font-size: 10.5px; font-weight: 700; color: var(--ink-soft); margin-bottom: 4px; }
+.digest-top-row { display: flex; justify-content: space-between; font-size: 12px; padding: 3px 0; }
 
 .cat-list { display: flex; flex-direction: column; gap: 12px; padding: 6px 2px 2px; }
 .cat-row-top { display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; margin-bottom: 4px; }
