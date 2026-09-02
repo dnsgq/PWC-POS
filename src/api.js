@@ -56,6 +56,11 @@ export async function updateEmployeeActive(id, active) {
   if (error) throw error;
 }
 
+export async function updateEmployeePin(id, pin) {
+  const { error } = await supabase.from('employees').update({ pin }).eq('id', id);
+  if (error) throw error;
+}
+
 // ---- attendance ----
 
 export async function fetchAttendance() {
