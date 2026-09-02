@@ -5,7 +5,7 @@ import {
   Users, Receipt, Trash2, CalendarClock, ChevronRight, Home, ListOrdered, FileBarChart2,
   UserMinus, PieChart, Download, TimerReset, AlertTriangle, SlidersHorizontal, Search
 } from 'lucide-react';
-import { fetchEmployees, insertEmployee, updateEmployeeActive, fetchAttendance, insertAttendance, clockOutAttendance, insertBackfillAttendance, updateAttendanceTimes, fetchTransactions, insertTransaction, updateTransaction, voidTransaction, fetchClosings, upsertClosing, fetchPushSubscriptionForEndpoint, savePushSubscription, deletePushSubscription, uploadClosingPhoto, fetchCategoryLimits, upsertCategoryLimit, deleteCategoryLimit } from './api';
+import { fetchEmployees, insertEmployee, updateEmployeeActive, updateEmployeePin, fetchAttendance, insertAttendance, clockOutAttendance, insertBackfillAttendance, updateAttendanceTimes, fetchTransactions, insertTransaction, updateTransaction, voidTransaction, fetchClosings, upsertClosing, fetchPushSubscriptionForEndpoint, savePushSubscription, deletePushSubscription, uploadClosingPhoto, fetchCategoryLimits, upsertCategoryLimit, deleteCategoryLimit } from './api';
 import { supabase } from './supabaseClient';
 
 const LOGO_ICON = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAMCAgMCAgMDAwMEAwMEBQgFBQQEBQoHBwYIDAoMDAsKCwsNDhIQDQ4RDgsLEBYQERMUFRUVDA8XGBYUGBIUFRT/2wBDAQMEBAUEBQkFBQkUDQsNFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBT/wAARCACgAKADASIAAhEBAxEB/8QAHQABAAICAwEBAAAAAAAAAAAAAAEIAgYFBwkDBP/EAE4QAAECBQIEAgUHBQkRAAAAAAECAwAEBQYRByEIEjFBE1EJFCJhcRUWMlKBkZIjQqGxwRc3coOTsrPD0xgkJicoNUNTYmVzdpbC0dLx/8QAHAEBAAIDAQEBAAAAAAAAAAAAAAUGAQQHAwII/8QAOREAAQMCBAEHCQgDAAAAAAAAAQACAwURBAYSMSFBUWGBkbHBBxMWInGCodHwFBcyUlPC4fEjQ0T/2gAMAwEAAhEDEQA/APT2EIRHrbSEIQRIQhBEhCEESEIQRIQhBEhCEESEIQRIQhBEhCEESEYRMFmyyhGMIJZZQjHG/WI+EEss4RjvCCWWUIx2xEQSyzhGEP1wSyzhGMRBLLOEYxEEss4RjmGYJZZQjHMAYJZQOkTiEAYLKCEIYzBEzEQiYIg6Qh1OwJPkBEhtf1F/hMEUQO0ZBtf1F/hMPDX9Rf4TBYusCN4fGM/CWf8ARq/CYgtrH5i/wmCzcLGJiDkZHeHT3wRTEDaG+YmCJ2hEH3xOMwRBgZhEbRI2gifoiImIgimGMwMRBFMAdojMBuMwRdK8ak9NUzhQ1UmpOZek5lqhPKQ/LuFtaTlIOFA5GxI+BMec+nfDjTLqsW3a5O3beDU5UJBqZdQxV1JQFKTkhOQSB9pj0R44d+EXVkf7ge/nIipmjqcaT2YnsKRK/wBGIn6TDHM5wkF7BUnM2LnwkUZgeWknk9i0I8KFBUTm7r0386yT/wBsYv8ACtbsu2HHrzvFpsbeI5W+VP3lOI3nWLUlvSqyJmshgTtQccTKyElvmYmF55E7b4GCTjfAwNzHXE/onalEobV3cQl3Oz1XnCCJB6cWzKSpIz4DTTftLKQd+XCR+k+Ncq1MoQY2WIve/wDC1ou4+wLQoFPrNeDpGYjRG3dx2X72uFS3phCXUXheTqD0cRWyUn7QnEaVrToTI6b6Y1246ddl3OztPbQptEzV1KbOXUJIIAB6KPfrGyS+lFEbtx++OHi6nVPSWVTFD9aXMSc6EjmUyptz2kLKc8oV17EHBjn6zNHiW4d50UPwZKcqzCW1MTSyEsPtupLjalAEj6Oxx0Uk4j4pNUp1dhl+zxlsjOBa4WcDbhwXvVMFVaDiYXYnEa4XEesNiL8fgu3+DXjErVv1CiaT60TPgVSblmVW1dUw5lqpNLSORh509XRkJSs7k+yr2uUqvrjz6x403bo7rRqBbEpblZfsx+ny4aTLuAKS8yUAJSpLgRkEgYPmO3len0b2qt2am6G1SVvCf+Vqla9adoTc+slTrzLbbak+Io/TUkqKQs7lITnJyT5YvDGB1wCAedWKmVBuLZpLmlw30m46Fa2JiDGk6lay2npEugfOypGky9anDIy024ytTCHAgr/KuAENJwPpK288AEiPAJ2U4t3zmAMfJiZammkOsuodaUMpW2sKSoe4jYx9O8YRImIPWEEUxBO228TmIGfhBEz9/lCA3gPKCJjEapqnqbQNG9P61eVzTK5Wi0lnxn1NI53FkkJQ2hP5y1KUlIHmew3jalKCApSiEpAySdgBHn36R7ie0tvvh9r1k21fVKrtzGqSRMjTnFO5S29zOflAnkIAHZRj6AuV8udpC0riD9I2zrBofedrSOldw0yUrlOXKtVebm2i00hRB8RSUo6YHQH7e8ctoyrn0ksxQzhVHldv4sRUi49TrYn7Hn5CWqiVzTkgWUMhpYPNyAAdMRbjRwY0lssJ6fI8rj+STFtpsbI5HBhvwVHzpGyOGHQ7Vx8FofEi8ij1vSmvVBKhb9NudpyfcKSUNghPIpXbA5VRy950RD/Fva89cdDertAnqKZOiPeqmZlZed5italjBSMpyQo7e0k9sjr3ij0Wq9yVmXuumJqlXpwbbZq1FkJgh4tt/RdYQoFJODunlO4BwcnGp2nP6aLoSaXOa+XzQKUhPI5b842uVU2O7fsBacdRgbe6Oa5zwT340YoahdjmcGudwdygtBsR08COFwrZknFRtpww4c11nB3EgWIOxBPEdPXZdy6YeoHi/vhVpNMS9AZozDVW9RATLGf8ROMBPshQ9vOO4X7447hYU29T9QJiS/zM/dU2uRx9Eo2yU+7dMa1I3xT6rbD2nHD7QZqXkJslFTu2dbW200lQ5Vr51e0twpyATggHCE9x3lp5YlP02s6m27TeZUtJt4LqwAp5ZOVuKx3UST7th2jcyVSsTFiJMfM0tbpYxur8Tg0W1OHITfbkHBRmeqrhnYVlPjcHPLi422bc3sPritma2eb8+dP64r5wk8bbfDXbl6UB7T6sXWiduWaqKp6mTCUIaBCUFBCkHccmev50WDaV+XbGMe2P1xQXT2/KJa7txy1UqCZJ1dXfdQlSFnKebGdge4MdDqbGyeba42HHwVWyYxsk8zXO0iw49q9qNCdcLa4htOpG8rWW+JCYWth6Wm0BD8q+jHO04ASOYZByCQQQR1jrbj2t9iv8Pkz43K4qVq0g61LqBT6wtTvheF4o3ZCg6crHYFPRcVn9G5xJ6Xaa2LdduXNelMt2pVO6XpuRl6gtTKHGFtNJQoLKeRIJSR7RHTePQy47epN82xP0eqyzVSo1Tl1Mvsk5S62sdQodOxCh0IBB2EUyRpFw0rpsLwyRrjxsQfbY9Nx3rzd0b1Cu3QtyRdo9UmZ6lS8wX5m1pchqnPNKwHWmGiD4S8DmQvOSsZVstUekNoXbSr7timXBQ5tM9SqiwmYl30jHMk9iOqVA5SpJ3BBB3EULq/DpqFRr9etCn0Ocrg8T+87hfT4Ug7LH6L0w/ghC0j2VtgFZUMoSQoEXK0M0lb0YsFugfKS6tNOTT0/NzRb8JtT7pBX4TeTyIGBgZJO5JJUYg6b9rbrZiRwGx+XQrjmI0qURT04+s4esB3nmdfgeU9/YMMQyTCJtUtOkIntEffBFMR2gIH3wRVX9JhedVs3hNr/yRNLknqtOylJfeaUQv1d1Z8VII6cyUcp9yiO8UkoemVr0SjSko3Q5B4NNpBcflkOLWcDKiojv/wDIt/6VjfhSV77hpv8AOcis6RhIBzygDp8IqGY5ZI2xBjiL38F1bIOGhmkxL5WBxGm1xe19V+4LS740wpVbtKqydJotKlqk+wUy73q6GuVeQR7QTkdDv74+VvXLrdbVv02jyjFpCUkJZEsyp7mUvkQkJTzEEAnAG+I33KeXYEn9MMk/DuMRA4Cu46nNLYHb89z4q6VrJlHrz2vxkf4RYWsB3brUvn9rqobNWcgjfPKv/wBo4upVTWCrvB6foun0+8Nw5NSCXV/erJjsAqwRvj7OsTnfOcfbmJM5uqp4F47P5Vdb5Lstt4tiI6x8lpbF764yjKWWJezGW29kttslKU/AA4EfQX9rqPzLOz/AV/5jcAnG2faPcdIZx1++M+l9V/OOz+Vg+S3LJ3iPaPktT+f2uySlQbs1Jzn6Cz+2Nb0702lrRoNWmrylqI9NPzi5tcw4lDiG0KA251pGBzcxx747RzzDoTjy6R15rjZFVvm0WZWklLk1LzImPVluBIeSElOMk4yM5GY8JK7jKqW4fFS6Wk783xW5h8m0rLTJMfTMOXyBps3gb9Vly3zJs68KKtLFNpMxIzKSgTEk01semUrQMgjrFzvRe3XVLk4WZeUqc0ucFCrM5SZRx05UJdHhrQjPknxFJA7AAdBFCuH6wK1Y1NqRrKRLLnXm1NyYWF+GEggqVg4BVkDA7JGYu56KFQPDbW/ddlQz/JsRNUf1Jp4Wya2jTY9v11KpZrJmwuCxUkAikeH3FrHha19vaL7XVz8b5h3gOkIsy5ynSH2wxDEESEPOAMEQnB3hvHUWuGt89pjVaBSKHR5KvVioIfm3peenVyqGJVrlTz86G1nmU4tKUgpxss9o0tPGSaJITU7c2nVbkZOVaU8/NUeelKg02hIKlKIK2l9AT9HPujYbh5XN1taSFpvxmHjk8094DuZaR6VxfLwsMpO3PctOA3/4p/ZFbEHCYsX6VGbRP8JlOmUJW2l+4aY4hDyOVaQpDpAUD0ODuO0V1A8NCc5zgdIoWZdofe8F2vyeb4v3P3IQVgkDI7xnyKJwR8Y1PVGbfp2ndxzMrMOS8w3JLW260opUg5G4I6HeOmqTa9YqtSsGVXeddbbuSbal3imZUSwFI5so9rfy3iKpdElqjHPjcBY27vmrbX80RUB+mSIuGnUSCBYXI8FZEtq5tgc+cAhRGCkpPkRHEtcJnOj2dR7xPnyvJMBwirx++LeXx8QRZ/QXHfnH11rmX3z0b9F311LlkpWnoD90C2vuFY+EcSeEYYH+MO8sjuXRGK+Enl3Oo14IHmpwD9sPQXHfnH11p989G/Rd9dS5hQwUpGcY8oxUMY7bR0Jc2ntRoWrs9Zrd7XA7JsU9qdTNLmCHFKXjKSArGBmNv0DnZ6boNcYnp6ZqHqdWdl23ZpwrWEhKdsn35P2xX6ll6amQmaR4NjZdBoOcYK9LGyGEta8EgkjkF9t12ej6Sd98jrFhfRPj/Jtrh6f4Wz+38WxFeRyhaQDnfqIsR6J883DVWv8Amyf/AKNiN3LX+73fFQHlC/5ff/arnhUCRiIAwYn3Rdlx5OohgeUMY7wzBE6wwSQBuScCHePz1GVVPU+alUTDsmt9pbSZhggONFSSAtOduYZyPeBBF5+a665U6V1BuS43CqpzNQmVUagSKXAkOSsmVIU4XCMNtqfVMLKjkkFIAUcCOpdJrTu7X/XCxX6nOzK7enZ8mZDa1MSjsmyPHeRLNZypohCWluOZCy6nBJAxZmt+j3eeel3mLukrgZlpSXkm6dcVNdRLqbYUVNc6Zd9KFqClFRKmzknJEdqaF6H3JZV91O47rXRy43TUUymNUd911CUqc8SYcV4jaCgq8NhASM4CDvvEy7Es8wWNdtsPEqAiwz2T63RXc4nU42NhyBo7Lk8VoXpRLXqNz8J9VmZCWXMmkVaSqs0lsZKGEKWla8eSfEBPkAT0EVDpF40Wt0yXm5WqyTrLqEqBL6EqTkbggnII8jHrbMy7M5Luy77SH2HUFtxpxIUlaSMFKgdiCCQQesVrrno3+Hmu1R+ecsFMm48rmU1T6lMy7APflbSvlSPcMDyEVCo05lRa0OdpLb9O/wDS6PQa/LQXyFkYeH2uCbbXtz86oJq3VJFzTG5kNz0qtxUkpKUJfQSSSnYAHJjSbPm5WauXRZlmZaecbqcvzobcSpScNdwDkb+cekZ9GTw782RZk4kj6tbm/wC0ir/F3w56X8LOqmh9VtKQXbknP1WaNSmJ2oOvt8jQaKVEuKPLjxFZI89+kSNEwraYDEHatRBvtbb5LQzRXZa3HJIYtP8AjLbA35zzBfr1d07oN9/JS63dVQtoywcSz6nU0SiXublJyFbKIwNx0Bjrf9wKwRurVetkeXzkYjb76n9E9TFyTtzVu3Ks5JpUhhTlS5CgKIKh7KxkEgdY1gWJw1px+Utg/GrOH+sjoErWPeXWafa5fn/DSSwwhhMgtyBgI36TdfAaAWA4oeHqpWvgLlYMbnpTpRa1l3Q5P0a9ancE76utpUnM1huZQEEjKi2nfIwME9MxqXzB4a3M/lLX+yrLH9ZHOWXLaEad1j5Vt+qW3Tqj4SmRMJqhWoIVjmA5lkDOOsYjaxrw6zR7xX3PLLJE5mqU3GxYLddiuu9S5liU4pKyuYfal0/IkqAXXAkHZPcmON0JrlOkabdKZioykuV1t5aA7MIQVJKU7jJ3HvjuLRHSbTjir4w7vkbiQ3dNuydrMTTCpCeW0j1hLjTZ9tsgnAWoYzjJ90WxT6M3h3BybJml/wAOtTh/rIpdbhbj2vwxNhqvfflXa8p1WWjw4aYR6i1uxNtwBzciphPXrQKVKPTcxWJAMsoK1csyhSjjsACSSfIRbT0Wdu1Ch8LDU3PS65dqtVyeqUmHBgrl1eG2lfwJbXg9xv3jZqX6N/h5pVRZnEWAmZWyoKSzOVKaeZUf9pCnMKHuOx7xZKTk5enSjMrKMNSsqw2lpphlAQ22hIwlKUjYAAAADYRBU6mspwcGuLi63w/tWKu5gmrrozJGGBl9je97ezmX2iDEjeHaJdVZM5hA798Q6QRDnEBGcILF1hDsYzhBLr5j3CJjOEEusMxSD0h9nC+NU+HqnzNGerNJXV59M80mXW614ZSxs5yjABI746GLxRIUR0UR8DiPKZhljdGDYkEX5rjfqX01wa4OIvYgrzNvnTTRjTd6SZruncs29NoUtpMpbs1N5SkgEnwkKCdz3xneNYKOHkj979z/AKOqP9lHq1zr+uofBRhzr/1i/wARinRZXa1gEuLmLuUh9h2ce9Tj6w4uJZBGB0tv8u5eXln2VoZfVbTSKPp8hc6ttTiUzVtTsuhQSMq9txATnHbO/aN9/uWNOlHH7mlLyds+ouD9seg3Ov66/tUYc6vrK++NWfKkrn3gx0rR0kn4gt7l7R1lgbaTDMJ6AB4FUE9HVphLy2sOsd9023nLatoOM29R5Uyq2EuoQQ486kLGcEobOentxfbMfQknqSficxEXyNgijbGCTpAFzvw5+lVxztTi625usDDpv+iM4R6LF1hA7xnCCXWHfMCB0jOEEukIQgsJCEIIkIQgiQhCCJCEIIkIQgiQhCCJCEIIkIQgiQhCCL//2Q==';
@@ -785,6 +785,22 @@ export default function App() {
     } catch (err) { console.error('Updating employee failed', err); }
   };
 
+  const [pinChangeError, setPinChangeError] = useState('');
+
+  const changeMyPin = async (newPin) => {
+    setPinChangeError('');
+    try {
+      await updateEmployeePin(currentEmployee.id, newPin);
+      setEmployees(prev => prev.map(e => e.id === currentEmployee.id ? { ...e, pin: newPin } : e));
+      setCurrentEmployee(prev => ({ ...prev, pin: newPin }));
+      return true;
+    } catch (err) {
+      console.error('Changing PIN failed', err);
+      setPinChangeError('Something went wrong saving your new PIN. Please try again.');
+      return false;
+    }
+  };
+
   const saveCategoryLimit = async (category, monthlyLimit) => {
     try {
       await upsertCategoryLimit(category, monthlyLimit, currentEmployee.name);
@@ -889,9 +905,7 @@ export default function App() {
           </div>
         </div>
         <div className="topbar-right">
-          {canManage && (
-            <button className="icon-btn" title="Settings" onClick={() => setShowSettings(true)}><Settings size={18} /></button>
-          )}
+          <button className="icon-btn" title="Settings" onClick={() => setShowSettings(true)}><Settings size={18} /></button>
           <div className="me-chip">
             <div className="avatar-circle avatar-sm">{initials(currentEmployee.name)}</div>
             <div>
@@ -1091,11 +1105,14 @@ export default function App() {
           employees={employees}
           currentEmployee={currentEmployee}
           categoryLimits={categoryLimits}
-          onClose={() => setShowSettings(false)}
+          canManage={canManage}
+          pinChangeError={pinChangeError}
+          onClose={() => { setShowSettings(false); setPinChangeError(''); }}
           onAdd={addEmployee}
           onToggle={toggleEmployeeActive}
           onSaveLimit={saveCategoryLimit}
           onDeleteLimit={deleteCategoryLimitAction}
+          onChangeMyPin={changeMyPin}
         />
       )}
       {showCloseDay && closingDraft && (
@@ -2003,7 +2020,7 @@ function TxnEditModal({ transaction, externalError, onClose, onSaveEdit, onVoid 
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-const [showVoidConfirm, setShowVoidConfirm] = useState(false);
+  const [showVoidConfirm, setShowVoidConfirm] = useState(false);
   const [voidReason, setVoidReason] = useState('');
   const [voidError, setVoidError] = useState('');
   const [voiding, setVoiding] = useState(false);
@@ -2021,7 +2038,7 @@ const [showVoidConfirm, setShowVoidConfirm] = useState(false);
     onSaveEdit(transaction.id, { amount: Number(amount), description, category, type, destination }, editReason.trim());
   };
 
-const submitVoid = () => {
+  const submitVoid = () => {
     setVoidError('');
     if (!voidReason.trim()) { setVoidError('Explain why this transaction is being voided.'); return; }
     setVoiding(true);
@@ -2282,13 +2299,19 @@ function BackfillEntryModal({ employees, defaultCreatedBy, externalError, onClos
   );
 }
 
-function SettingsModal({ employees, currentEmployee, categoryLimits, onClose, onAdd, onToggle, onSaveLimit, onDeleteLimit }) {
+function SettingsModal({ employees, currentEmployee, categoryLimits, canManage, pinChangeError, onClose, onAdd, onToggle, onSaveLimit, onDeleteLimit, onChangeMyPin }) {
   const [name, setName] = useState('');
   const [pinVal, setPinVal] = useState('');
   const [role, setRole] = useState('Employee');
   const [error, setError] = useState('');
   const [notifStatus, setNotifStatus] = useState('checking');
   const [notifError, setNotifError] = useState('');
+  const [currentPinInput, setCurrentPinInput] = useState('');
+  const [newPinInput, setNewPinInput] = useState('');
+  const [confirmPinInput, setConfirmPinInput] = useState('');
+  const [pinFormError, setPinFormError] = useState('');
+  const [pinSaved, setPinSaved] = useState(false);
+  const [changingPin, setChangingPin] = useState(false);
   const [limitInputs, setLimitInputs] = useState(() => {
     const initial = {};
     for (const c of CATEGORIES) {
@@ -2300,6 +2323,29 @@ function SettingsModal({ employees, currentEmployee, categoryLimits, onClose, on
   const [limitSaved, setLimitSaved] = useState('');
 
   const canGetNotifications = currentEmployee && ['Manager', 'Admin', 'Owner'].includes(currentEmployee.role);
+
+  useEffect(() => {
+    if (pinChangeError) { setPinFormError(pinChangeError); setChangingPin(false); }
+  }, [pinChangeError]);
+
+  const handleChangePin = async () => {
+    setPinFormError('');
+    if (currentPinInput !== currentEmployee.pin) { setPinFormError('Current PIN is incorrect.'); return; }
+    if (!/^\d{4}$/.test(newPinInput)) { setPinFormError('New PIN must be exactly 4 digits.'); return; }
+    if (newPinInput !== confirmPinInput) { setPinFormError('New PIN and confirmation don\u2019t match.'); return; }
+    if (employees.some(e => e.pin === newPinInput && e.active !== false && e.id !== currentEmployee.id)) {
+      setPinFormError('That PIN is already in use by someone else.');
+      return;
+    }
+    setChangingPin(true);
+    const success = await onChangeMyPin(newPinInput);
+    setChangingPin(false);
+    if (success) {
+      setCurrentPinInput(''); setNewPinInput(''); setConfirmPinInput('');
+      setPinSaved(true);
+      setTimeout(() => setPinSaved(false), 2000);
+    }
+  };
 
   const handleSaveLimit = async (category) => {
     const val = limitInputs[category];
@@ -2354,6 +2400,19 @@ function SettingsModal({ employees, currentEmployee, categoryLimits, onClose, on
 
   return (
     <Modal title="Settings" onClose={onClose} wide>
+      <div className="modal-sub" style={{ marginTop: 0 }}>Change my PIN</div>
+      <label className="field-label" style={{ marginTop: 0 }}>Current PIN</label>
+      <input className="field-input mono-input" value={currentPinInput} maxLength={4} inputMode="numeric" onChange={e => setCurrentPinInput(e.target.value.replace(/\D/g, '').slice(0, 4))} placeholder="0000" />
+      <label className="field-label">New 4-digit PIN</label>
+      <input className="field-input mono-input" value={newPinInput} maxLength={4} inputMode="numeric" onChange={e => setNewPinInput(e.target.value.replace(/\D/g, '').slice(0, 4))} placeholder="0000" />
+      <label className="field-label">Confirm new PIN</label>
+      <input className="field-input mono-input" value={confirmPinInput} maxLength={4} inputMode="numeric" onChange={e => setConfirmPinInput(e.target.value.replace(/\D/g, '').slice(0, 4))} placeholder="0000" />
+      {pinFormError && <div className="error-line"><AlertCircle size={14} /> {pinFormError}</div>}
+      <button className="btn btn-purple btn-block" style={{ marginTop: 10 }} onClick={handleChangePin} disabled={changingPin}>
+        {pinSaved ? <Check size={16} /> : <Lock size={16} />} {pinSaved ? 'PIN updated' : (changingPin ? 'Saving…' : 'Change PIN')}
+      </button>
+      <div className="divider" />
+
       {canGetNotifications && (
         <>
           <div className="modal-sub" style={{ marginTop: 0 }}>Notifications on this device</div>
@@ -2393,33 +2452,37 @@ function SettingsModal({ employees, currentEmployee, categoryLimits, onClose, on
           <div className="divider" />
         </>
       )}
-      <div className="modal-sub" style={{ marginTop: 0 }}>Employees</div>
-      <div className="emp-list">
-        {employees.map(e => (
-          <div key={e.id} className="emp-row">
-            <div className="avatar-circle avatar-sm">{initials(e.name)}</div>
-            <div className="emp-row-info">
-              <div className="emp-row-name">{e.name}</div>
-              <div className="emp-row-role">{e.role} · PIN {e.pin}</div>
-            </div>
-            <button className={`btn ${e.active === false ? 'btn-outline' : 'btn-danger-outline'} btn-sm`} onClick={() => onToggle(e.id)}>
-              {e.active === false ? 'Reactivate' : 'Deactivate'}
-            </button>
+      {canManage && (
+        <>
+          <div className="modal-sub" style={{ marginTop: 0 }}>Employees</div>
+          <div className="emp-list">
+            {employees.map(e => (
+              <div key={e.id} className="emp-row">
+                <div className="avatar-circle avatar-sm">{initials(e.name)}</div>
+                <div className="emp-row-info">
+                  <div className="emp-row-name">{e.name}</div>
+                  <div className="emp-row-role">{e.role} · PIN {e.pin}</div>
+                </div>
+                <button className={`btn ${e.active === false ? 'btn-outline' : 'btn-danger-outline'} btn-sm`} onClick={() => onToggle(e.id)}>
+                  {e.active === false ? 'Reactivate' : 'Deactivate'}
+                </button>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
-      <div className="divider" />
-      <div className="modal-sub"><UserPlus size={14} style={{ verticalAlign: -2 }} /> Add employee</div>
-      <label className="field-label">Name</label>
-      <input className="field-input" value={name} onChange={e => setName(e.target.value)} placeholder="Full name" />
-      <label className="field-label">4-digit PIN</label>
-      <input className="field-input mono-input" value={pinVal} maxLength={4} inputMode="numeric" onChange={e => setPinVal(e.target.value.replace(/\D/g, '').slice(0, 4))} placeholder="0000" />
-      <label className="field-label">Role</label>
-      <select className="field-input" value={role} onChange={e => setRole(e.target.value)}>
-        {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
-      </select>
-      {error && <div className="error-line"><AlertCircle size={14} /> {error}</div>}
-      <button className="btn btn-highlight btn-block" style={{ marginTop: 12 }} onClick={submit}><Plus size={16} /> Add employee</button>
+          <div className="divider" />
+          <div className="modal-sub"><UserPlus size={14} style={{ verticalAlign: -2 }} /> Add employee</div>
+          <label className="field-label">Name</label>
+          <input className="field-input" value={name} onChange={e => setName(e.target.value)} placeholder="Full name" />
+          <label className="field-label">4-digit PIN</label>
+          <input className="field-input mono-input" value={pinVal} maxLength={4} inputMode="numeric" onChange={e => setPinVal(e.target.value.replace(/\D/g, '').slice(0, 4))} placeholder="0000" />
+          <label className="field-label">Role</label>
+          <select className="field-input" value={role} onChange={e => setRole(e.target.value)}>
+            {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+          </select>
+          {error && <div className="error-line"><AlertCircle size={14} /> {error}</div>}
+          <button className="btn btn-highlight btn-block" style={{ marginTop: 12 }} onClick={submit}><Plus size={16} /> Add employee</button>
+        </>
+      )}
     </Modal>
   );
 }
