@@ -1153,7 +1153,7 @@ export default function App() {
           <button className={`nav-btn ${activeView === 'reports' ? 'nav-btn-active' : ''}`} onClick={() => setActiveView('reports')}>
             <FileBarChart2 size={19} /><span>Reports</span>
           </button>
-      )}
+       )}
         {canManage && (
           <button className={`nav-btn ${activeView === 'analytics' ? 'nav-btn-active' : ''}`} onClick={() => setActiveView('analytics')}>
             <PieChart size={19} /><span>Analytics</span>
