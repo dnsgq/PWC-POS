@@ -47,6 +47,54 @@ const addDaysToKey = (dateKey, n) => {
   d.setDate(d.getDate() + n);
   return todayStr(d);
 };
+function carryForwardToDate(transactionsList, closingsList, targetDate) {
+  const closed = closingsList.filter(c => c.status === 'Closed' && c.date < targetDate).sort((a, b) => b.date.localeCompare(a.date));
+  const lastClosed = closed[0] || null;
+  if (!lastClosed) return { cash: 0, gcash: 0 };
+  let cash = lastClosed.countedCash || 0;
+  let gcash = lastClosed.countedGCash || 0;
+  for (const t of transactionsList) {
+    if (t.voided) continue;
+    const d = localDateKey(t.datetime);
+    if (d > lastClosed.date && d < targetDate) {
+      const amt = Number(t.amount) || 0;
+      const signed = t.type === 'Cash In' ? amt : -amt;
+      if (t.destination === 'Cash') cash += signed;
+      else gcash += signed;
+    }
+  }
+  return { cash, gcash };
+}
+
+function expectedForDateCalc(transactionsList, closingsList, dateStr) {
+  const existingClosing = closingsList.find(c => c.date === dateStr);
+  let baseCash, baseGCash;
+  if (existingClosing) {
+    // A record already exists for this date (e.g. a manually-entered
+    // first-shift opening balance, or an already-closed day) - use its own
+    // opening figures rather than recomputing from a prior closed day.
+    baseCash = existingClosing.openingCash;
+    baseGCash = existingClosing.openingGCash;
+  } else {
+    const carried = carryForwardToDate(transactionsList, closingsList, dateStr);
+    baseCash = carried.cash;
+    baseGCash = carried.gcash;
+  }
+  let cashIn = 0, cashOut = 0, gcashIn = 0, gcashOut = 0;
+  for (const t of transactionsList) {
+    if (t.voided) continue;
+    if (localDateKey(t.datetime) !== dateStr) continue;
+    const amt = Number(t.amount) || 0;
+    if (t.destination === 'Cash') { t.type === 'Cash In' ? cashIn += amt : cashOut += amt; }
+    else { t.type === 'Cash In' ? gcashIn += amt : gcashOut += amt; }
+  }
+  return {
+    openingCash: baseCash, openingGCash: baseGCash,
+    expectedCash: baseCash + cashIn - cashOut,
+    expectedGCash: baseGCash + gcashIn - gcashOut,
+  };
+}
+
 function computeDigestStats(transactions, closings, predicate) {
   let cashIn = 0, cashOut = 0, count = 0;
   const catTotals = {};
@@ -510,22 +558,7 @@ export default function App() {
   // the running total accurate regardless of skipped closings; only the
   // *photo/physical-count* step gets skipped on an unclosed day, not the
   // transactions themselves.
-  const carryForwardTo = (targetDate) => {
-    if (!lastClosedClosing) return { cash: 0, gcash: 0 };
-    let cash = lastClosedClosing.countedCash || 0;
-    let gcash = lastClosedClosing.countedGCash || 0;
-    for (const t of transactions) {
-      if (t.voided) continue;
-      const d = localDateKey(t.datetime);
-      if (d > lastClosedClosing.date && d < targetDate) {
-        const amt = Number(t.amount) || 0;
-        const signed = t.type === 'Cash In' ? amt : -amt;
-        if (t.destination === 'Cash') cash += signed;
-        else gcash += signed;
-      }
-    }
-    return { cash, gcash };
-  };
+  const carryForwardTo = (targetDate) => carryForwardToDate(transactions, closings, targetDate);
 
   const openingCash = todaysClosing ? todaysClosing.openingCash : (lastClosedClosing ? carryForwardTo(today).cash : 0);
   const openingGCash = todaysClosing ? todaysClosing.openingGCash : (lastClosedClosing ? carryForwardTo(today).gcash : 0);
@@ -562,33 +595,32 @@ export default function App() {
 
   const [resolvingDate, setResolvingDate] = useState(null);
 
-  const expectedForDate = (dateStr) => {
-    const existingClosing = closings.find(c => c.date === dateStr);
-    let baseCash, baseGCash;
-    if (existingClosing) {
-      // A record already exists for this date (e.g. a manually-entered
-      // first-shift opening balance saved as a Draft) - use its own opening
-      // figures rather than recomputing from a prior closed day.
-      baseCash = existingClosing.openingCash;
-      baseGCash = existingClosing.openingGCash;
-    } else {
-      const carried = carryForwardTo(dateStr);
-      baseCash = carried.cash;
-      baseGCash = carried.gcash;
+  const expectedForDate = (dateStr) => expectedForDateCalc(transactions, closings, dateStr);
+
+  // Recalculates a CLOSED day's Expected Cash/GCash and Difference after a
+  // transaction on that day was edited, voided, or backdated in. The
+  // physical Counted Cash never changes here - only the derived "expected"
+  // figure and the gap against what was actually counted. Takes explicit
+  // fresh arrays so it reflects a mutation that hasn't finished propagating
+  // through component state yet.
+  const recalculateClosingForDate = async (dateStr, freshTransactions, freshClosings) => {
+    const existing = freshClosings.find(c => c.date === dateStr);
+    if (!existing || existing.status !== 'Closed') return;
+    const { expectedCash: newExpectedCash, expectedGCash: newExpectedGCash } = expectedForDateCalc(freshTransactions, freshClosings, dateStr);
+    if (existing.expectedCash === newExpectedCash && existing.expectedGCash === newExpectedGCash) return;
+    try {
+      const updated = {
+        ...existing,
+        expectedCash: newExpectedCash,
+        expectedGCash: newExpectedGCash,
+        cashDifference: (existing.countedCash || 0) - newExpectedCash,
+        gcashDifference: (existing.countedGCash || 0) - newExpectedGCash,
+      };
+      const saved = await upsertClosing(updated);
+      setClosings(prev => prev.map(c => c.date === dateStr ? saved : c));
+    } catch (err) {
+      console.error('Recalculating closing failed', err);
     }
-    let cashIn = 0, cashOut = 0, gcashIn = 0, gcashOut = 0;
-    for (const t of transactions) {
-      if (t.voided) continue;
-      if (localDateKey(t.datetime) !== dateStr) continue;
-      const amt = Number(t.amount) || 0;
-      if (t.destination === 'Cash') { t.type === 'Cash In' ? cashIn += amt : cashOut += amt; }
-      else { t.type === 'Cash In' ? gcashIn += amt : gcashOut += amt; }
-    }
-    return {
-      openingCash: baseCash, openingGCash: baseGCash,
-      expectedCash: baseCash + cashIn - cashOut,
-      expectedGCash: baseGCash + gcashIn - gcashOut,
-    };
   };
 
   const [resolveError, setResolveError] = useState('');
@@ -714,7 +746,9 @@ export default function App() {
       };
       await insertTransaction(rec);
       markOwnAction(rec.id);
-      setTransactions(prev => [...prev, rec]);
+      const nextTransactions = [...transactions, rec];
+      setTransactions(nextTransactions);
+      await recalculateClosingForDate(localDateKey(rec.datetime), nextTransactions, closings);
       setShowBackfill(false);
     } catch (err) {
       console.error('Adding backfill transaction failed', err);
@@ -729,9 +763,12 @@ export default function App() {
     setTxnActionError('');
     try {
       await updateTransaction(id, fields, currentEmployee.name, reason);
-      setTransactions(prev => prev.map(t => t.id === id ? {
+      const nextTransactions = transactions.map(t => t.id === id ? {
         ...t, ...fields, editedBy: currentEmployee.name, editedAt: new Date().toISOString(), editReason: reason,
-      } : t));
+      } : t);
+      setTransactions(nextTransactions);
+      const edited = nextTransactions.find(t => t.id === id);
+      if (edited) await recalculateClosingForDate(localDateKey(edited.datetime), nextTransactions, closings);
       setEditingTxn(null);
     } catch (err) {
       console.error('Editing transaction failed', err);
@@ -743,9 +780,12 @@ export default function App() {
     setTxnActionError('');
     try {
       await voidTransaction(id, currentEmployee.name, reason);
-      setTransactions(prev => prev.map(t => t.id === id ? {
+      const nextTransactions = transactions.map(t => t.id === id ? {
         ...t, voided: true, voidedBy: currentEmployee.name, voidedAt: new Date().toISOString(), voidReason: reason,
-      } : t));
+      } : t);
+      setTransactions(nextTransactions);
+      const voided = nextTransactions.find(t => t.id === id);
+      if (voided) await recalculateClosingForDate(localDateKey(voided.datetime), nextTransactions, closings);
       setEditingTxn(null);
     } catch (err) {
       console.error('Voiding transaction failed', err);
@@ -2554,14 +2594,6 @@ function CashCountModal({ expectedCash, expectedGCash, externalError, onClose, o
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    if (externalError) {
-      setError(externalError);
-      setSubmitting(false);
-    }
-  }, [externalError]);
-
-  const total = DENOMINATIONS.reduce((sum, d) => sum + d * (Number(counts[d]) || 0), 0);
   const diff = total - expectedCash;
   const gcashDiff = (Number(gcash) || 0) - expectedGCash;
   const hasAnyDiscrepancy = diff !== 0 || gcashDiff !== 0;
