@@ -17,13 +17,6 @@ const CATEGORIES = [
   "School Supplies Income", "Personalzied School Essentials Income", "Photoprinting Income",
   "Mug Printing Income", "Sticker Printing Income", "Keychain Income", "Button Pin Income",
   "Toys Income", "Accessories Income", "Candies Income", "General Merchandise Income",
-  "Supplies", "Utilities", "Equipment", "Transportation", "Miscellaneous", "Pink Wallet Migration"
-];
-const ROLES = ["Employee", "Manager", "Admin", "Owner"];
-const DISCREPANCY_THRESHOLD = 30;
-// Public VAPID key - safe to expose in client code by design (this is what
-// authenticates push messages as coming from this app; the matching PRIVATE
-// key stays server-side only, inside the Supabase Edge Function).
 const VAPID_PUBLIC_KEY = 'BPAegFHAmir2L-9gRZ5XplSXDtPsWE11BDVGonHYOqab3SpWRaMwOXsURpfqm1v0jqDMQmRcduEOVL7Yy-ARqmI';
 
 const peso = (n) => new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', minimumFractionDigits: 2 }).format(Number(n) || 0);
@@ -45,10 +38,6 @@ const mondayOf = (dateKey) => {
 const addDaysToKey = (dateKey, n) => {
   const d = new Date(dateKey + 'T00:00:00');
   d.setDate(d.getDate() + n);
-  return todayStr(d);
-};
-function carryForwardToDate(transactionsList, closingsList, targetDate) {
-  const closed = closingsList.filter(c => c.status === 'Closed' && c.date < targetDate).sort((a, b) => b.date.localeCompare(a.date));
   const lastClosed = closed[0] || null;
   if (!lastClosed) return { cash: 0, gcash: 0 };
   let cash = lastClosed.countedCash || 0;
@@ -69,41 +58,6 @@ function carryForwardToDate(transactionsList, closingsList, targetDate) {
 function expectedForDateCalc(transactionsList, closingsList, dateStr) {
   const existingClosing = closingsList.find(c => c.date === dateStr);
   let baseCash, baseGCash;
-  if (existingClosing) {
-    // A record already exists for this date (e.g. a manually-entered
-    // first-shift opening balance, or an already-closed day) - use its own
-    // opening figures rather than recomputing from a prior closed day.
-    baseCash = existingClosing.openingCash;
-    baseGCash = existingClosing.openingGCash;
-  } else {
-    const carried = carryForwardToDate(transactionsList, closingsList, dateStr);
-    baseCash = carried.cash;
-    baseGCash = carried.gcash;
-  }
-  let cashIn = 0, cashOut = 0, gcashIn = 0, gcashOut = 0;
-  for (const t of transactionsList) {
-    if (t.voided) continue;
-    if (localDateKey(t.datetime) !== dateStr) continue;
-    const amt = Number(t.amount) || 0;
-    if (t.destination === 'Cash') { t.type === 'Cash In' ? cashIn += amt : cashOut += amt; }
-    else { t.type === 'Cash In' ? gcashIn += amt : gcashOut += amt; }
-  }
-  return {
-    openingCash: baseCash, openingGCash: baseGCash,
-    expectedCash: baseCash + cashIn - cashOut,
-    expectedGCash: baseGCash + gcashIn - gcashOut,
-  };
-}
-
-function computeDigestStats(transactions, closings, predicate) {
-  let cashIn = 0, cashOut = 0, count = 0;
-  const catTotals = {};
-  for (const t of transactions) {
-    if (t.voided) continue;
-    const dk = localDateKey(t.datetime);
-    if (!predicate(dk)) continue;
-    count++;
-    const amt = Number(t.amount) || 0;
     if (t.destination === 'Cash') { t.type === 'Cash In' ? cashIn += amt : cashOut += amt; }
     const signed = (t.type === 'Cash In' ? 1 : -1) * amt;
     catTotals[t.category] = (catTotals[t.category] || 0) + signed;
@@ -2591,13 +2545,94 @@ function CashCountModal({ expectedCash, expectedGCash, externalError, onClose, o
   const [photoFile, setPhotoFile] = useState(null);
   const [photoPreview, setPhotoPreview] = useState('');
   const [photoProcessing, setPhotoProcessing] = useState(false);
+  const [cameraActive, setCameraActive] = useState(false);
+  const [cameraError, setCameraError] = useState('');
+  const [useFileFallback, setUseFileFallback] = useState(false);
+  const videoRef = useRef(null);
+  const streamRef = useRef(null);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  useEffect(() => {
+    if (externalError) {
+      setError(externalError);
+      setSubmitting(false);
+    }
+  }, [externalError]);
+
+  const total = DENOMINATIONS.reduce((sum, d) => sum + d * (Number(counts[d]) || 0), 0);
   const diff = total - expectedCash;
   const gcashDiff = (Number(gcash) || 0) - expectedGCash;
   const hasAnyDiscrepancy = diff !== 0 || gcashDiff !== 0;
   const hasLargeDiscrepancy = Math.abs(diff) >= DISCREPANCY_THRESHOLD || Math.abs(gcashDiff) >= DISCREPANCY_THRESHOLD;
+
+  const startCamera = async () => {
+    setCameraError('');
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setCameraError('Live camera isn\u2019t available on this browser.');
+      setUseFileFallback(true);
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      streamRef.current = stream;
+      setCameraActive(true);
+    } catch (err) {
+      console.error('Camera access failed', err);
+      setCameraError('Could not access the camera. You can upload a photo instead.');
+      setUseFileFallback(true);
+    }
+  };
+
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+    }
+    setCameraActive(false);
+  };
+
+  useEffect(() => {
+    if (cameraActive && videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current;
+      videoRef.current.play().catch(() => {});
+    }
+  }, [cameraActive]);
+
+  useEffect(() => () => stopCamera(), []);
+
+  const capturePhoto = () => {
+    const video = videoRef.current;
+    if (!video || !video.videoWidth) return;
+    const maxDimension = 1280;
+    let width = video.videoWidth;
+    let height = video.videoHeight;
+    if (width > height && width > maxDimension) {
+      height = Math.round((height * maxDimension) / width);
+      width = maxDimension;
+    } else if (height >= width && height > maxDimension) {
+      width = Math.round((width * maxDimension) / height);
+      height = maxDimension;
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, width, height);
+    canvas.toBlob((blob) => {
+      if (!blob) { setCameraError('Could not capture the photo. Please try again.'); return; }
+      const file = new File([blob], 'drawer-photo.jpg', { type: 'image/jpeg' });
+      setPhotoFile(file);
+      setPhotoPreview(URL.createObjectURL(file));
+      stopCamera();
+    }, 'image/jpeg', 0.7);
+  };
+
+  const retakePhoto = () => {
+    setPhotoFile(null);
+    setPhotoPreview('');
+    startCamera();
+  };
 
   const handlePhotoChange = async (e) => {
     const file = e.target.files && e.target.files[0];
@@ -2674,9 +2709,34 @@ function CashCountModal({ expectedCash, expectedGCash, externalError, onClose, o
       <input className="field-input mono-input" type="number" min="0" step="0.01" value={gcash} onChange={e => setGcash(e.target.value)} />
 
       <label className="field-label">Photo of the counted drawer</label>
-      <input className="field-input" type="file" accept="image/*" capture="environment" onChange={handlePhotoChange} disabled={photoProcessing} />
+
+      {photoPreview && !photoProcessing && (
+        <>
+          <img src={photoPreview} alt="Counted drawer" className="photo-preview" />
+          <button className="btn btn-outline btn-block" style={{ marginTop: 8 }} onClick={retakePhoto}>Retake photo</button>
+        </>
+      )}
+
+      {!photoPreview && cameraActive && (
+        <div className="camera-preview-wrap">
+          <video ref={videoRef} className="camera-preview" playsInline muted autoPlay />
+          <button className="btn btn-highlight btn-block" style={{ marginTop: 8 }} onClick={capturePhoto}>
+            <Check size={16} /> Capture photo
+          </button>
+          <button className="btn btn-outline btn-block" style={{ marginTop: 6 }} onClick={stopCamera}>Cancel</button>
+        </div>
+      )}
+
+      {!photoPreview && !cameraActive && !useFileFallback && (
+        <button className="btn btn-purple btn-block" onClick={startCamera}>Open camera</button>
+      )}
+
+      {useFileFallback && !photoPreview && (
+        <input className="field-input" type="file" accept="image/*" onChange={handlePhotoChange} disabled={photoProcessing} />
+      )}
+
+      {cameraError && <div className="error-line"><AlertCircle size={14} /> {cameraError}</div>}
       {photoProcessing && <div className="hint-line">Processing photo…</div>}
-      {photoPreview && !photoProcessing && <img src={photoPreview} alt="Counted drawer" className="photo-preview" />}
 
       {hasAnyDiscrepancy && (
         <>
@@ -3124,6 +3184,8 @@ html, body {
 .diff-short { background: var(--danger-bg); color: var(--danger); }
 
 .photo-preview { width: 100%; max-height: 220px; object-fit: cover; border-radius: 10px; margin-top: 8px; border: 1px solid var(--paper-dark); }
+.camera-preview-wrap { margin-top: 8px; }
+.camera-preview { width: 100%; max-height: 280px; object-fit: cover; border-radius: 10px; border: 1px solid var(--paper-dark); background: #000; }
 .confirm-checkbox-row { display: flex; align-items: flex-start; gap: 8px; margin-top: 12px; font-size: 12.5px; color: var(--ink); cursor: pointer; }
 .confirm-checkbox-row input { margin-top: 2px; width: 16px; height: 16px; flex-shrink: 0; }
 
