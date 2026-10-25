@@ -17,6 +17,7 @@ const CATEGORIES = [
   "School Supplies Income", "Personalzied School Essentials Income", "Photoprinting Income",
   "Mug Printing Income", "Sticker Printing Income", "Keychain Income", "Button Pin Income",
   "Toys Income", "Accessories Income", "Candies Income", "General Merchandise Income",
+];
 const VAPID_PUBLIC_KEY = 'BPAegFHAmir2L-9gRZ5XplSXDtPsWE11BDVGonHYOqab3SpWRaMwOXsURpfqm1v0jqDMQmRcduEOVL7Yy-ARqmI';
 
 const peso = (n) => new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', minimumFractionDigits: 2 }).format(Number(n) || 0);
