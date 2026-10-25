@@ -17,7 +17,13 @@ const CATEGORIES = [
   "School Supplies Income", "Personalzied School Essentials Income", "Photoprinting Income",
   "Mug Printing Income", "Sticker Printing Income", "Keychain Income", "Button Pin Income",
   "Toys Income", "Accessories Income", "Candies Income", "General Merchandise Income",
+  "Supplies", "Utilities", "Equipment", "Transportation", "Miscellaneous", "Pink Wallet Migration"
 ];
+const ROLES = ["Employee", "Manager", "Admin", "Owner"];
+const DISCREPANCY_THRESHOLD = 30;
+// Public VAPID key - safe to expose in client code by design (this is what
+// authenticates push messages as coming from this app; the matching PRIVATE
+// key stays server-side only, inside the Supabase Edge Function).
 const VAPID_PUBLIC_KEY = 'BPAegFHAmir2L-9gRZ5XplSXDtPsWE11BDVGonHYOqab3SpWRaMwOXsURpfqm1v0jqDMQmRcduEOVL7Yy-ARqmI';
 
 const peso = (n) => new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', minimumFractionDigits: 2 }).format(Number(n) || 0);
@@ -39,6 +45,10 @@ const mondayOf = (dateKey) => {
 const addDaysToKey = (dateKey, n) => {
   const d = new Date(dateKey + 'T00:00:00');
   d.setDate(d.getDate() + n);
+  return todayStr(d);
+};
+function carryForwardToDate(transactionsList, closingsList, targetDate) {
+  const closed = closingsList.filter(c => c.status === 'Closed' && c.date < targetDate).sort((a, b) => b.date.localeCompare(a.date));
   const lastClosed = closed[0] || null;
   if (!lastClosed) return { cash: 0, gcash: 0 };
   let cash = lastClosed.countedCash || 0;
@@ -59,6 +69,41 @@ const addDaysToKey = (dateKey, n) => {
 function expectedForDateCalc(transactionsList, closingsList, dateStr) {
   const existingClosing = closingsList.find(c => c.date === dateStr);
   let baseCash, baseGCash;
+  if (existingClosing) {
+    // A record already exists for this date (e.g. a manually-entered
+    // first-shift opening balance, or an already-closed day) - use its own
+    // opening figures rather than recomputing from a prior closed day.
+    baseCash = existingClosing.openingCash;
+    baseGCash = existingClosing.openingGCash;
+  } else {
+    const carried = carryForwardToDate(transactionsList, closingsList, dateStr);
+    baseCash = carried.cash;
+    baseGCash = carried.gcash;
+  }
+  let cashIn = 0, cashOut = 0, gcashIn = 0, gcashOut = 0;
+  for (const t of transactionsList) {
+    if (t.voided) continue;
+    if (localDateKey(t.datetime) !== dateStr) continue;
+    const amt = Number(t.amount) || 0;
+    if (t.destination === 'Cash') { t.type === 'Cash In' ? cashIn += amt : cashOut += amt; }
+    else { t.type === 'Cash In' ? gcashIn += amt : gcashOut += amt; }
+  }
+  return {
+    openingCash: baseCash, openingGCash: baseGCash,
+    expectedCash: baseCash + cashIn - cashOut,
+    expectedGCash: baseGCash + gcashIn - gcashOut,
+  };
+}
+
+function computeDigestStats(transactions, closings, predicate) {
+  let cashIn = 0, cashOut = 0, count = 0;
+  const catTotals = {};
+  for (const t of transactions) {
+    if (t.voided) continue;
+    const dk = localDateKey(t.datetime);
+    if (!predicate(dk)) continue;
+    count++;
+    const amt = Number(t.amount) || 0;
     if (t.destination === 'Cash') { t.type === 'Cash In' ? cashIn += amt : cashOut += amt; }
     const signed = (t.type === 'Cash In' ? 1 : -1) * amt;
     catTotals[t.category] = (catTotals[t.category] || 0) + signed;
